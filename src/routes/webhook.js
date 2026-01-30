@@ -101,18 +101,79 @@ router.post('/webhook', async (req, res) => {
 
     logger.info('Classification determined', { classification });
 
-    // Return success immediately - continue processing in background
-    res.status(200).json({
-      success: true,
-      message: 'Lead received and being processed',
-      classification: classification,
-      processingTime: Date.now() - startTime,
-    });
+    switch (classification) {
+      case 'valid_lead':
+        // Valid lead path - Continue to contact creation and job ad generation
+        logger.info('Processing valid lead');
 
-    // Continue processing in background (don't await)
-    processLeadInBackground(classification, formData, normalizedData, aiScore, companyId, dataWithCompanyId).catch(error => {
-      logger.error('Background processing failed', error);
-    });
+        // Step 11: Prepare Contact Data
+        const contactData = prepareContactData(formData, normalizedData);
+
+        // Step 12: Upsert Contact
+        await upsertContact(contactData);
+
+        // Step 13: Generate Job Ad Draft
+        const jobAd = await generateJobAd(formData, normalizedData);
+        
+        // Add company_id to job ad data
+        const jobAdWithCompanyId = { ...jobAd, company_id: companyId };
+
+        // Step 14: Create Job Ad Record
+        await createJobAdRecord(jobAdWithCompanyId, formData, aiScore);
+
+        // Step 15: Send Email to Lead
+        await sendEmailToLead(formData.email, jobAd);
+
+        return res.status(200).json({
+          success: true,
+          message: 'Valid lead processed successfully',
+          classification: 'valid_lead',
+          lead_score: normalizedData.lead_score,
+          job_ad_title: jobAd.title,
+          processingTime: Date.now() - startTime,
+        });
+
+      case 'invalid_lead':
+        // Invalid lead path
+        logger.info('Processing invalid lead');
+        await insertInvalidLead(formData, aiScore);
+
+        return res.status(200).json({
+          success: true,
+          message: 'Lead classified as invalid',
+          classification: 'invalid_lead',
+          reason: aiScore.ai_reasoning,
+          processingTime: Date.now() - startTime,
+        });
+
+      case 'likely_candidate':
+        // Candidate path
+        logger.info('Processing likely candidate');
+        await insertCandidateLead(formData, aiScore, companyId);
+
+        return res.status(200).json({
+          success: true,
+          message: 'Lead classified as job seeker',
+          classification: 'likely_candidate',
+          processingTime: Date.now() - startTime,
+        });
+
+      case 'likely_spam':
+        // Spam path (from AI classification)
+        logger.info('Processing likely spam (AI classified)');
+        await insertSpamLead(formData, aiScore.ai_reasoning);
+
+        return res.status(200).json({
+          success: true,
+          message: 'Lead classified as spam',
+          classification: 'likely_spam',
+          processingTime: Date.now() - startTime,
+        });
+
+      default:
+        logger.error('Unknown classification', { classification });
+        throw new Error(`Unknown classification: ${classification}`);
+    }
   } catch (error) {
     logger.error('Webhook processing failed', error, {
       body: req.body,
@@ -128,74 +189,6 @@ router.post('/webhook', async (req, res) => {
     });
   }
 });
-
-/**
- * Process lead in background after responding to user
- */
-async function processLeadInBackground(classification, formData, normalizedData, aiScore, companyId) {
-  try {
-    switch (classification) {
-      case 'valid_lead':
-        // Valid lead path - Continue to contact creation and job ad generation
-        logger.info('Background: Processing valid lead');
-
-        // Step 11: Prepare Contact Data
-        const contactData = prepareContactData(formData, normalizedData);
-
-        // Step 12: Upsert Contact
-        await upsertContact(contactData);
-
-        // Step 13: Generate Job Ad Draft
-        const jobAd = await generateJobAd(formData, normalizedData);
-
-        // Add company_id to job ad data
-        const jobAdWithCompanyId = { ...jobAd, company_id: companyId };
-
-        // Step 14: Create Job Ad Record
-        await createJobAdRecord(jobAdWithCompanyId, formData, aiScore);
-
-        // Step 15: Send Email to Lead
-        await sendEmailToLead(formData.email, jobAd);
-
-        logger.info('Background: Valid lead processed successfully', {
-          email: formData.email,
-          jobAdTitle: jobAd.title,
-        });
-        break;
-
-      case 'invalid_lead':
-        // Invalid lead path
-        logger.info('Background: Processing invalid lead');
-        await insertInvalidLead(formData, aiScore);
-        logger.info('Background: Invalid lead processed', { email: formData.email });
-        break;
-
-      case 'likely_candidate':
-        // Candidate path
-        logger.info('Background: Processing likely candidate');
-        await insertCandidateLead(formData, aiScore, companyId);
-        logger.info('Background: Candidate lead processed', { email: formData.email });
-        break;
-
-      case 'likely_spam':
-        // Spam path (from AI classification)
-        logger.info('Background: Processing likely spam');
-        await insertSpamLead(formData, aiScore.ai_reasoning);
-        logger.info('Background: Spam lead processed', { email: formData.email });
-        break;
-
-      default:
-        logger.error('Background: Unknown classification', { classification });
-        throw new Error(`Unknown classification: ${classification}`);
-    }
-  } catch (error) {
-    logger.error('Background processing error', error, {
-      email: formData.email,
-      classification,
-    });
-    // Don't throw - just log the error since we've already responded to the user
-  }
-}
 
 /**
  * Health check endpoint
