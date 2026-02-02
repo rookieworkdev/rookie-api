@@ -301,6 +301,23 @@ curl -X POST http://localhost:3000/api/webhook \
 ```
 **Expected:** `classification: "likely_candidate"`
 
+### 4. Invalid Lead Test
+```bash
+curl -X POST http://localhost:3000/api/webhook \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Anna Karlsson",
+    "email": "anna.karlsson@gmail.com",
+    "phone": "0709876543",
+    "company": "Stockholm Sjukhus",
+    "industry": "healthcare",
+    "service_type": "bemanning",
+    "message": "Vi behöver rekrytera 5 undersköterskor och 2 sjuksköterskor till vår avdelning så snart som möjligt.",
+    "subject": "Rekrytering vårdpersonal"
+  }'
+```
+**Expected:** `classification: "invalid_lead"`, rejected_leads table only (no company created)
+
 ## Next Steps
 
 ### Immediate

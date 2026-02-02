@@ -71,33 +71,8 @@ router.post('/webhook', async (req, res) => {
     // Step 4: Scoring AI Agent - Get AI classification
     const aiScore = await scoreLead(validatedData);
 
-    // Step 5: Extract Domain
-    const dataWithDomain = extractDomain({ ...validatedData, ...aiScore });
-
-    // Step 6: Find or Create Company
-    const companyId = await findOrCreateCompany(
-      dataWithDomain.company_name,
-      dataWithDomain.extracted_domain
-    );
-
-    // Step 7: Parse Company ID (already done in the function above)
-    const dataWithCompanyId = { ...dataWithDomain, company_id: companyId };
-
-    // Step 8: Create Signal
-    const signal = await createSignal(companyId, {
-      full_name: dataWithCompanyId.full_name,
-      email: dataWithCompanyId.email,
-      phone: dataWithCompanyId.phone,
-      needs_description: dataWithCompanyId.needs_description,
-      lead_score: dataWithCompanyId.lead_score,
-      classification: dataWithCompanyId.classification,
-    });
-
-    // Step 9: Normalize Company Data
-    const normalizedData = normalizeCompanyData(formData, aiScore, { company_id: companyId });
-
-    // Step 10: Switch - Route based on classification
-    const classification = normalizedData.classification;
+    // Step 5: Switch - Route based on classification
+    const classification = aiScore.classification;
 
     logger.info('Classification determined', { classification });
 
@@ -106,22 +81,44 @@ router.post('/webhook', async (req, res) => {
         // Valid lead path - Continue to contact creation and job ad generation
         logger.info('Processing valid lead');
 
-        // Step 11: Prepare Contact Data
+        // Step 6: Extract Domain
+        const dataWithDomain = extractDomain({ ...validatedData, ...aiScore });
+
+        // Step 7: Find or Create Company
+        const companyId = await findOrCreateCompany(
+          dataWithDomain.company_name,
+          dataWithDomain.extracted_domain
+        );
+
+        // Step 8: Create Signal
+        await createSignal(companyId, {
+          full_name: dataWithDomain.full_name,
+          email: dataWithDomain.email,
+          phone: dataWithDomain.phone,
+          needs_description: dataWithDomain.needs_description,
+          lead_score: dataWithDomain.lead_score,
+          classification: dataWithDomain.classification,
+        });
+
+        // Step 9: Normalize Company Data
+        const normalizedData = normalizeCompanyData(formData, aiScore, { company_id: companyId });
+
+        // Step 10: Prepare Contact Data
         const contactData = prepareContactData(formData, normalizedData);
 
-        // Step 12: Upsert Contact
+        // Step 11: Upsert Contact
         await upsertContact(contactData);
 
-        // Step 13: Generate Job Ad Draft
+        // Step 12: Generate Job Ad Draft
         const jobAd = await generateJobAd(formData, normalizedData);
-        
+
         // Add company_id to job ad data
         const jobAdWithCompanyId = { ...jobAd, company_id: companyId };
 
-        // Step 14: Create Job Ad Record
+        // Step 13: Create Job Ad Record
         await createJobAdRecord(jobAdWithCompanyId, formData, aiScore);
 
-        // Step 15: Send Email to Lead
+        // Step 14: Send Email to Lead
         await sendEmailToLead(formData.email, jobAd);
 
         return res.status(200).json({
@@ -149,7 +146,7 @@ router.post('/webhook', async (req, res) => {
       case 'likely_candidate':
         // Candidate path
         logger.info('Processing likely candidate');
-        await insertCandidateLead(formData, aiScore, companyId);
+        await insertCandidateLead(formData, aiScore);
 
         return res.status(200).json({
           success: true,

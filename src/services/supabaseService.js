@@ -139,14 +139,13 @@ export async function insertInvalidLead(leadData, aiData) {
  * Inserts a candidate lead into candidate_leads
  * Replicates "Insert Candidate Lead" node
  */
-export async function insertCandidateLead(leadData, aiData, companyId) {
+export async function insertCandidateLead(leadData, aiData) {
   try {
     logger.info('Inserting candidate lead', { email: leadData.email });
 
     const { data, error } = await supabase
       .from('candidate_leads')
       .insert({
-        id: companyId,
         source: 'website_form',
         full_name: leadData.full_name,
         email: leadData.email,
