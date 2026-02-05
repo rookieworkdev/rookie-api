@@ -10,8 +10,7 @@ import { scoreLead, generateJobAd } from '../services/aiService.js';
 import {
   findOrCreateCompany,
   createSignal,
-  insertSpamLead,
-  insertInvalidLead,
+  insertRejectedLead,
   insertCandidateLead,
   upsertContact,
   createJobAdRecord,
@@ -87,7 +86,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
         isSpam: validatedData.is_likely_spam,
       });
 
-      await insertSpamLead(validatedData);
+      await insertRejectedLead(validatedData);
 
       const response: WebhookSuccessResponse = {
         success: true,
@@ -137,11 +136,11 @@ router.post('/webhook', async (req: Request, res: Response) => {
         // Step 10: Prepare Contact Data
         const contactData = prepareContactData(formData, normalizedData);
 
-        // Step 11: Upsert Contact
-        await upsertContact(contactData);
-
-        // Step 12: Generate Job Ad Draft
-        const jobAd = await generateJobAd(formData, normalizedData);
+        // Step 11 & 12: Upsert Contact and Generate Job Ad in parallel (independent operations)
+        const [, jobAd] = await Promise.all([
+          upsertContact(contactData),
+          generateJobAd(formData, normalizedData),
+        ]);
 
         // Add company_id to job ad data
         const jobAdWithCompanyId: JobAdWithCompanyId = { ...jobAd, company_id: companyId };
@@ -167,7 +166,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
       case 'invalid_lead': {
         // Invalid lead path
         logger.info('Processing invalid lead');
-        await insertInvalidLead(formData, aiScore);
+        await insertRejectedLead(formData, aiScore.classification, aiScore.ai_reasoning);
 
         const response: WebhookSuccessResponse = {
           success: true,
@@ -198,7 +197,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
       case 'likely_spam': {
         // Spam path (from AI classification)
         logger.info('Processing likely spam (AI classified)');
-        await insertSpamLead(formData, aiScore.ai_reasoning);
+        await insertRejectedLead(formData, 'likely_spam', aiScore.ai_reasoning);
 
         const response: WebhookSuccessResponse = {
           success: true,
@@ -225,7 +224,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
     // Save form data to rejected_leads so it's not lost
     if (formData) {
       try {
-        await insertSpamLead(formData, `Processing error: ${err.message}`, 'processing_error');
+        await insertRejectedLead(formData, 'processing_error', `Processing error: ${err.message}`);
         logger.info('Form data saved to rejected_leads after processing failure');
       } catch (saveError) {
         logger.error('Failed to save form data after error', saveError);

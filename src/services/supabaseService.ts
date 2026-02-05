@@ -84,13 +84,13 @@ export async function createSignal(
 }
 
 /**
- * Inserts a spam lead into rejected_leads
- * Replicates "Insert Spam Lead" and "Insert Spam Lead - Fast Reject" nodes
+ * Inserts a rejected lead into rejected_leads table
+ * Consolidated function for spam, invalid, and error cases
  */
-export async function insertSpamLead(
+export async function insertRejectedLead(
   leadData: FormData,
-  aiReasoning: string = 'N/A (Fast Reject)',
-  classification: string = 'likely_spam'
+  classification: string = 'likely_spam',
+  aiReasoning: string = 'N/A (Fast Reject)'
 ): Promise<RejectedLeadRecord> {
   try {
     logger.info('Inserting rejected lead', { email: leadData.email, classification });
@@ -104,7 +104,7 @@ export async function insertSpamLead(
         company_name: leadData.company_name,
         submitted_description: leadData.needs_description,
         source: 'website_form',
-        classification: classification,
+        classification,
         ai_reasoning: aiReasoning,
       })
       .select()
@@ -121,46 +121,6 @@ export async function insertSpamLead(
     const err = error as Error;
     logger.error('Error inserting rejected lead', error);
     throw new Error(`Failed to insert rejected lead: ${err.message}`);
-  }
-}
-
-/**
- * Inserts an invalid lead into rejected_leads
- * Replicates "Insert Invalid Lead" node
- */
-export async function insertInvalidLead(
-  leadData: FormData,
-  aiData: AIScoreResult
-): Promise<RejectedLeadRecord> {
-  try {
-    logger.info('Inserting invalid lead', { email: leadData.email });
-
-    const { data, error } = await supabase
-      .from('rejected_leads')
-      .insert({
-        full_name: leadData.full_name,
-        email: leadData.email,
-        phone: leadData.phone,
-        company_name: leadData.company_name,
-        submitted_description: leadData.needs_description,
-        source: 'website_form',
-        classification: aiData.classification,
-        ai_reasoning: aiData.ai_reasoning,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      throw error;
-    }
-
-    logger.info('Invalid lead inserted', { leadId: data.id });
-
-    return data as RejectedLeadRecord;
-  } catch (error) {
-    const err = error as Error;
-    logger.error('Error inserting invalid lead', error);
-    throw new Error(`Failed to insert invalid lead: ${err.message}`);
   }
 }
 
