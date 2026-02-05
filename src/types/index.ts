@@ -1,14 +1,5 @@
-// Form submission data from webhook
-export interface WebhookRequestBody {
-  name?: string;
-  email?: string;
-  phone?: string;
-  company?: string;
-  industry?: string;
-  service_type?: string;
-  message?: string;
-  subject?: string;
-}
+// Form submission data from webhook - validated by zod schema
+export { WebhookRequestBody } from '../schemas/webhook.js';
 
 // Structured form data after initial processing
 export interface FormData {

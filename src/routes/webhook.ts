@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express';
+import express, { Request, Response, Router } from 'express';
 import { logger } from '../utils/logger.js';
 import {
   validateLead,
@@ -17,20 +17,23 @@ import {
   createJobAdRecord,
 } from '../services/supabaseService.js';
 import { sendEmailToLead, sendAdminAlert } from '../services/emailService.js';
+import {
+  parseWebhookRequest,
+  formatValidationErrors,
+} from '../schemas/webhook.js';
 import type {
-  WebhookRequestBody,
   FormData,
   WebhookSuccessResponse,
   JobAdWithCompanyId,
 } from '../types/index.js';
 
-const router = express.Router();
+const router: Router = express.Router();
 
 /**
  * Main webhook handler
  * Replicates the entire N8n flow
  */
-router.post('/webhook', async (req: Request<object, object, WebhookRequestBody>, res: Response) => {
+router.post('/webhook', async (req: Request, res: Response) => {
   const startTime = Date.now();
 
   // Declare formData outside try block so it's accessible in catch
@@ -39,17 +42,34 @@ router.post('/webhook', async (req: Request<object, object, WebhookRequestBody>,
   try {
     logger.info('Webhook received', { body: req.body });
 
-    // Step 1: Edit Fields - Extract and structure the form data
+    // Step 1: Validate request body with zod
+    const validationResult = parseWebhookRequest(req.body);
+
+    if (!validationResult.success) {
+      const errorMessage = formatValidationErrors(validationResult.errors);
+      logger.warn('Request validation failed', { errors: errorMessage });
+
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid request data',
+        errors: errorMessage,
+        processingTime: Date.now() - startTime,
+      });
+    }
+
+    const validatedBody = validationResult.data;
+
+    // Step 2: Structure the validated form data
     formData = {
       id: Date.now().toString(),
-      full_name: req.body.name,
-      email: req.body.email,
-      phone: req.body.phone,
-      company_name: req.body.company,
-      industry: req.body.industry,
-      service_type: req.body.service_type,
-      needs_description: req.body.message,
-      subject: req.body.subject,
+      full_name: validatedBody.name,
+      email: validatedBody.email,
+      phone: validatedBody.phone,
+      company_name: validatedBody.company,
+      industry: validatedBody.industry,
+      service_type: validatedBody.service_type,
+      needs_description: validatedBody.message,
+      subject: validatedBody.subject,
     };
 
     logger.info('Form data structured', { email: formData.email });

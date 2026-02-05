@@ -1,4 +1,4 @@
-import express, { Request, Response, NextFunction } from 'express';
+import express, { Request, Response, NextFunction, Application } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
@@ -10,7 +10,7 @@ interface ErrorWithStatus extends Error {
   status?: number;
 }
 
-const app = express();
+const app: Application = express();
 
 // Security middleware
 app.use(helmet());
