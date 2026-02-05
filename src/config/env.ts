@@ -16,7 +16,7 @@ export const config: Config = {
 
   // Supabase
   supabase: {
-    url: process.env.SUPABASE_URL || 'https://ydsjrhnrsnfefhuefgul.supabase.co',
+    url: process.env.SUPABASE_URL!,
     key: process.env.SUPABASE_KEY,
   },
 
@@ -38,7 +38,7 @@ export const config: Config = {
 };
 
 // Validation
-const requiredEnvVars = ['OPENAI_API_KEY', 'SUPABASE_KEY', 'RESEND_API_KEY'];
+const requiredEnvVars = ['OPENAI_API_KEY', 'SUPABASE_URL', 'SUPABASE_KEY', 'RESEND_API_KEY'];
 const missing = requiredEnvVars.filter((key) => !process.env[key]);
 
 if (missing.length > 0 && process.env.NODE_ENV !== 'test') {
