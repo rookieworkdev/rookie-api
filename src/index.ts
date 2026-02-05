@@ -95,23 +95,38 @@ app.use((err: ErrorWithStatus, req: Request, res: Response, _next: NextFunction)
 
 // Start server
 const PORT = config.port;
+const SHUTDOWN_TIMEOUT_MS = 10000; // 10 seconds
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   logger.info(`Server started on port ${PORT}`, {
     nodeEnv: config.nodeEnv,
     port: PORT,
   });
 });
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM received, shutting down gracefully');
-  process.exit(0);
-});
+// Graceful shutdown handler
+function gracefulShutdown(signal: string) {
+  logger.info(`${signal} received, shutting down gracefully`);
 
-process.on('SIGINT', () => {
-  logger.info('SIGINT received, shutting down gracefully');
-  process.exit(0);
-});
+  // Stop accepting new connections
+  server.close((err) => {
+    if (err) {
+      logger.error('Error during server close', err);
+      process.exit(1);
+    }
+
+    logger.info('HTTP server closed, all connections drained');
+    process.exit(0);
+  });
+
+  // Force exit if shutdown takes too long
+  setTimeout(() => {
+    logger.warn('Shutdown timeout reached, forcing exit');
+    process.exit(1);
+  }, SHUTDOWN_TIMEOUT_MS);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 export default app;
