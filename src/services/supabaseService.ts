@@ -190,7 +190,7 @@ export async function upsertContact(contactData: ContactData): Promise<ContactRe
 }
 
 /**
- * Creates a job ad record in website_jobs
+ * Creates a job ad record in job_ads
  * Replicates "Create Job Ad Record" node
  */
 export async function createJobAdRecord(
@@ -204,7 +204,7 @@ export async function createJobAdRecord(
     const now = Date.now().toString();
 
     const { data, error } = await supabase
-      .from('website_jobs')
+      .from('job_ads')
       .insert({
         company_id: jobAdData.company_id,
         title: jobAdData.title,
@@ -219,7 +219,6 @@ export async function createJobAdRecord(
         raw_data: formData,
         service_type: formData.service_type,
         is_ai_generated: true,
-        company: jobAdData.company,
         location: jobAdData.location,
         external_url: jobAdData.external_url,
         posted_date: jobAdData.posted_date,

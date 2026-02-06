@@ -92,7 +92,7 @@ POST /api/webhook
   │   ↓
   │   📄 Generate Job Ad (OpenAI)
   │   ↓
-  │   💾 Save to website_jobs
+  │   💾 Save to job_ads
   │   ↓
   │   📧 Send Email (Gmail)
   │   ↓
@@ -172,7 +172,7 @@ You need these tables (see README.md for full schemas):
 - `rejected_leads`
 - `candidate_leads`
 - `contacts`
-- `website_jobs`
+- `job_ads`
 
 And this stored procedure:
 ```sql

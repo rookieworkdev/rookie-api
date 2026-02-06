@@ -169,7 +169,7 @@ router.post('/webhook', verifyWebhookSignature, async (req: Request, res: Respon
         await createJobAdRecord(jobAdWithCompanyId, formData, aiScore);
 
         // Step 14: Send Email to Lead
-        await sendEmailToLead(formData.email || '', jobAd);
+        await sendEmailToLead(formData.email || '', jobAd, formData.company_name || '');
 
         const response: WebhookSuccessResponse = {
           success: true,

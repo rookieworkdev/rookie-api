@@ -21,7 +21,6 @@ const AIScoreResultSchema = z.object({
 
 const JobAdDataSchema = z.object({
   title: z.string().min(1),
-  company: z.string().min(1),
   description: z.string().min(1),
   location: z.string().min(1),
   category: z.string().min(1),
@@ -366,7 +365,6 @@ Client's Description: ${leadData.needs_description}
 Return ONLY valid JSON in this format:
 {
   "title": "compelling job title in Swedish (30-60 chars)",
-  "company": "${leadData.company_name}",
   "description": "professional description in Swedish (200-400 words)",
   "location": "Stockholm",
   "category": "${normalizedData.role_category}",

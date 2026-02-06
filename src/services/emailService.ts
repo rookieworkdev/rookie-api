@@ -8,7 +8,7 @@ const resend = new Resend(config.resend.apiKey);
 /**
  * Generates the HTML email template
  */
-function generateEmailHTML(jobAd: JobAdData): string {
+function generateEmailHTML(jobAd: JobAdData, companyName: string): string {
   return `<!DOCTYPE html>
 <html lang="sv">
 <head>
@@ -149,7 +149,7 @@ function generateEmailHTML(jobAd: JobAdData): string {
         <p>Baserat på din beskrivning har vi skapat ett förslag:</p>
 
         <h3>${jobAd.title}</h3>
-        <h4>${jobAd.company}</h4>
+        <h4>${companyName}</h4>
         <div class="job-description">${jobAd.description}</div>
 
         <p><em>Du kan redigera och slutföra denna annons i företagsportalen.</em></p>
@@ -200,7 +200,8 @@ function generateEmailHTML(jobAd: JobAdData): string {
  */
 export async function sendEmailToLead(
   leadEmail: string,
-  jobAd: JobAdData
+  jobAd: JobAdData,
+  companyName: string
 ): Promise<EmailResponse> {
   try {
     logger.info('Sending email to lead via Resend', { email: maskEmail(leadEmail) });
@@ -211,7 +212,7 @@ export async function sendEmailToLead(
       from: config.resend.fromEmail,
       to: 'rookiework.dev@gmail.com',
       subject: `Tack för din förfrågan till Rookie - Vi har kandidater! [Lead: ${leadEmail}]`,
-      html: generateEmailHTML(jobAd),
+      html: generateEmailHTML(jobAd, companyName),
     });
 
     if (error) {

@@ -77,7 +77,6 @@ export interface ContactData {
 // Job ad data from AI generation
 export interface JobAdData {
   title: string;
-  company: string;
   description: string;
   location: string;
   category: string;
@@ -145,7 +144,6 @@ export interface JobAdRecord {
   raw_data: FormData;
   service_type?: string;
   is_ai_generated: boolean;
-  company: string;
   location: string;
   external_url: string;
   posted_date: string;

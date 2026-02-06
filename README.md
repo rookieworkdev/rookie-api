@@ -165,10 +165,10 @@ CREATE TABLE contacts (
 );
 ```
 
-#### 6. `website_jobs`
+#### 6. `job_ads`
 
 ```sql
-CREATE TABLE website_jobs (
+CREATE TABLE job_ads (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id UUID REFERENCES companies(id),
   title TEXT NOT NULL,

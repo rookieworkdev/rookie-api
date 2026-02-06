@@ -84,7 +84,7 @@ POST /api/webhook
     → prepareContactData()
     → upsertContact() → contacts table
     → generateJobAd() → OpenAI job ad
-    → createJobAdRecord() → website_jobs table
+    → createJobAdRecord() → job_ads table
     → sendEmailToLead() → Gmail
   → Response 200: "valid lead processed"
 ```
