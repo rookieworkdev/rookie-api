@@ -33,7 +33,19 @@ function verifyScraperApiKey(req: Request, res: Response, next: NextFunction): v
   next();
 }
 
-// Apply API key verification to all routes
+/**
+ * GET /api/scraping/jobs/health
+ * Health check for scraper endpoints (public - no auth required)
+ */
+router.get('/health', (_req: Request, res: Response) => {
+  res.status(200).json({
+    success: true,
+    enabled: config.scraper.enabled,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Apply API key verification to protected routes below
 router.use(verifyScraperApiKey);
 
 /**
@@ -146,18 +158,6 @@ router.post('/cleanup', async (_req: Request, res: Response) => {
       error: getErrorMessage(error),
     });
   }
-});
-
-/**
- * GET /api/scraping/jobs/health
- * Health check for scraper endpoints
- */
-router.get('/health', (_req: Request, res: Response) => {
-  res.status(200).json({
-    success: true,
-    enabled: config.scraper.enabled,
-    timestamp: new Date().toISOString(),
-  });
 });
 
 export default router;

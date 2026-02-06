@@ -262,7 +262,7 @@ export async function findExistingJobsBySource(
 
     const { data, error } = await supabase
       .from('job_ads')
-      .select('external_id, url')
+      .select('external_id, external_url')
       .eq('source', source);
 
     if (error) {
@@ -273,7 +273,7 @@ export async function findExistingJobsBySource(
     const existingIds = new Set<string>();
     for (const job of data || []) {
       if (job.external_id) existingIds.add(job.external_id);
-      if (job.url) existingIds.add(job.url);
+      if (job.external_url) existingIds.add(job.external_url);
     }
 
     logger.info('Fetched existing jobs', { source, count: existingIds.size });
@@ -304,7 +304,6 @@ export async function createJobAdFromScraper(
         description: job.description,
         source: job.source,
         external_id: job.externalId,
-        url: job.url,
         external_url: job.url,
         location: job.location,
         job_type: job.jobType,
@@ -325,6 +324,7 @@ export async function createJobAdFromScraper(
       .single();
 
     if (error) {
+      logger.error('Supabase insert error', { code: error.code, message: error.message, details: error.details });
       throw error;
     }
 

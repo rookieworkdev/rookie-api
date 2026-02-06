@@ -1,18 +1,20 @@
 import { z } from 'zod';
 
 // Schema for raw Indeed job from Apify
+// Note: Using lenient validation because Apify can return various formats
 export const RawIndeedJobSchema = z.object({
   id: z.string(),
   positionName: z.string(),
   company: z.string(),
-  location: z.string().optional().default(''),
-  description: z.string().optional().default(''),
-  url: z.string().url(),
-  externalApplyLink: z.string().optional(),
-  postingDateParsed: z.string().optional(),
-  postedAt: z.string().optional(),
-  jobType: z.array(z.string()).optional(),
-  salary: z.string().optional(),
+  location: z.string().optional().nullable().default(''),
+  description: z.string().optional().nullable().default(''),
+  // URL validation is lenient - Apify can return URLs with encoding issues
+  url: z.string().min(1),
+  externalApplyLink: z.string().optional().nullable(),
+  postingDateParsed: z.string().optional().nullable(),
+  postedAt: z.string().optional().nullable(),
+  jobType: z.array(z.string()).optional().nullable(),
+  salary: z.string().optional().nullable(),
 });
 
 export type RawIndeedJobType = z.infer<typeof RawIndeedJobSchema>;
@@ -24,7 +26,7 @@ export const NormalizedJobSchema = z.object({
   company: z.string().min(1),
   location: z.string(),
   description: z.string(),
-  url: z.string().url(),
+  url: z.string(), // Lenient - URLs from scrapers may have various formats
   applicationUrl: z.string().optional(),
   postedAt: z.string().optional(),
   jobType: z.string().optional(),
@@ -63,12 +65,24 @@ export type ScraperRunRequestType = z.infer<typeof ScraperRunRequestSchema>;
 export function parseRawIndeedJobs(data: unknown[]): z.infer<typeof RawIndeedJobSchema>[] {
   const results: z.infer<typeof RawIndeedJobSchema>[] = [];
 
+  // Debug: log first item's full structure to understand Apify response
+  if (data.length > 0) {
+    console.log('[DEBUG] First raw Apify item:', JSON.stringify(data[0], null, 2));
+  }
+
   for (const item of data) {
     const parsed = RawIndeedJobSchema.safeParse(item);
     if (parsed.success) {
       results.push(parsed.data);
+    } else {
+      // Debug: log why validation failed
+      console.log('[DEBUG] Job validation failed:', JSON.stringify(parsed.error.errors, null, 2));
+      const itemObj = item as Record<string, unknown>;
+      console.log('[DEBUG] Failed item - id:', itemObj.id, 'positionName:', itemObj.positionName, 'url:', itemObj.url);
     }
   }
+
+  console.log(`[DEBUG] Parsed ${results.length}/${data.length} jobs successfully`);
 
   return results;
 }
