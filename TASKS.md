@@ -20,19 +20,31 @@
 
 ## Pending - Infrastructure
 
-- [ ] GitHub Actions cron workflow (`.github/workflows/job-scraper-cron.yml`)
+- [x] GitHub Actions cron workflow (`.github/workflows/job-scraper-cron.yml`)
 - [ ] Add environment variables to deployment
+- [ ] Add GitHub Secrets (see below)
 
 ## Environment Variables Required
+
+Add to your deployment environment (e.g., Render, Railway, Fly.io):
 
 ```
 OPENROUTER_API_KEY=     # For AI job evaluation
 APIFY_API_KEY=          # For Apify scrapers
-SCRAPER_API_KEY=        # For API authentication
+SCRAPER_API_KEY=        # For API authentication (generate with: openssl rand -hex 32)
 SCRAPER_KEYWORDS=       # Optional: override default keywords
 SCRAPER_EXCLUSION_KEYWORDS=  # Optional: comma-separated
 JOB_RETENTION_DAYS=20   # Optional: defaults to 20
 ```
+
+## GitHub Secrets Required
+
+Add to your GitHub repo → Settings → Secrets and variables → Actions:
+
+| Secret Name | Value |
+|-------------|-------|
+| `API_BASE_URL` | Your deployed API URL (e.g., `https://rookie-api.onrender.com`) |
+| `SCRAPER_API_KEY` | Same value as your deployment's SCRAPER_API_KEY |
 
 ## API Endpoints
 
