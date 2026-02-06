@@ -14,6 +14,13 @@ export const config: Config = {
     temperature: 0.7,
   },
 
+  // OpenRouter (for job evaluation with model fallback)
+  openRouter: {
+    apiKey: process.env.OPENROUTER_API_KEY,
+    primaryModel: 'openai/gpt-4o',
+    fallbackModel: 'openai/gpt-4o-mini',
+  },
+
   // Supabase
   supabase: {
     url: process.env.SUPABASE_URL!,
@@ -34,6 +41,22 @@ export const config: Config = {
   // Webhook security
   webhook: {
     secret: process.env.WEBHOOK_SECRET,
+  },
+
+  // Apify (for scrapers)
+  apify: {
+    apiKey: process.env.APIFY_API_KEY,
+  },
+
+  // Job scraper settings
+  scraper: {
+    apiKey: process.env.SCRAPER_API_KEY,
+    enabled: process.env.SCRAPER_ENABLED !== 'false',
+    keywords: process.env.SCRAPER_KEYWORDS || '',
+    exclusionKeywords: process.env.SCRAPER_EXCLUSION_KEYWORDS?.split(',').map((k) => k.trim()) || [],
+    country: process.env.SCRAPER_COUNTRY || 'SE',
+    maxItems: parseInt(process.env.SCRAPER_MAX_ITEMS || '50', 10),
+    retentionDays: parseInt(process.env.JOB_RETENTION_DAYS || '20', 10),
   },
 };
 

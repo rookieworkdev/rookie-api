@@ -5,6 +5,7 @@ import rateLimit from 'express-rate-limit';
 import { config } from './config/env.js';
 import { logger } from './utils/logger.js';
 import webhookRouter from './routes/webhook.js';
+import jobScrapingRouter from './routes/jobScraping.js';
 // Import for Express Request type augmentation (adds rawBody property)
 import './middleware/webhookAuth.js';
 
@@ -68,16 +69,22 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
 // Mount routes
 app.use('/api', webhookRouter);
+app.use('/api/scraping/jobs', jobScrapingRouter);
 
 // Root endpoint
 app.get('/', (_req: Request, res: Response) => {
   res.json({
-    service: 'Rookie Recruitment Webhook',
+    service: 'Rookie Recruitment API',
     version: '1.0.0',
     status: 'running',
     endpoints: {
       webhook: 'POST /api/webhook',
       health: 'GET /api/health',
+      scraping: {
+        indeed: 'POST /api/scraping/jobs/indeed',
+        cleanup: 'POST /api/scraping/jobs/cleanup',
+        health: 'GET /api/scraping/jobs/health',
+      },
     },
   });
 });

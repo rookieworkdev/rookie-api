@@ -159,6 +159,11 @@ export interface Config {
     model: string;
     temperature: number;
   };
+  openRouter: {
+    apiKey: string | undefined;
+    primaryModel: string;
+    fallbackModel: string;
+  };
   supabase: {
     url: string;
     key: string | undefined;
@@ -172,6 +177,18 @@ export interface Config {
   };
   webhook: {
     secret: string | undefined;
+  };
+  apify: {
+    apiKey: string | undefined;
+  };
+  scraper: {
+    apiKey: string | undefined;
+    enabled: boolean;
+    keywords: string;
+    exclusionKeywords: string[];
+    country: string;
+    maxItems: number;
+    retentionDays: number;
   };
 }
 

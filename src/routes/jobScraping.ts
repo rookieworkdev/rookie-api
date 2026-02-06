@@ -1,0 +1,163 @@
+import { Router, Request, Response, NextFunction } from 'express';
+import { config } from '../config/env.js';
+import { logger, getErrorMessage } from '../utils/logger.js';
+import { runIndeedFetch } from '../services/jobs/indeedJobScraper.js';
+import { runJobProcessingPipeline } from '../services/jobs/jobProcessor.js';
+import { deleteOldJobsBySource } from '../services/supabaseService.js';
+import { sendJobScraperDigestEmail } from '../services/emailService.js';
+import { ScraperRunRequestSchema, type ScraperRunRequestType } from '../schemas/scraper.js';
+
+const router: Router = Router();
+
+/**
+ * Middleware to verify scraper API key
+ */
+function verifyScraperApiKey(req: Request, res: Response, next: NextFunction): void {
+  const apiKey = req.headers['x-api-key'];
+
+  if (!config.scraper.apiKey) {
+    logger.warn('Scraper API key not configured, allowing request');
+    next();
+    return;
+  }
+
+  if (!apiKey || apiKey !== config.scraper.apiKey) {
+    logger.warn('Invalid or missing scraper API key');
+    res.status(401).json({
+      success: false,
+      error: 'Invalid or missing API key',
+    });
+    return;
+  }
+
+  next();
+}
+
+// Apply API key verification to all routes
+router.use(verifyScraperApiKey);
+
+/**
+ * POST /api/scraping/jobs/indeed
+ * Run the Indeed job scraper
+ */
+router.post('/indeed', async (req: Request, res: Response) => {
+  const startTime = Date.now();
+
+  try {
+    if (!config.scraper.enabled) {
+      return res.status(503).json({
+        success: false,
+        error: 'Scraper is disabled',
+      });
+    }
+
+    // Parse and validate request body
+    const parseResult = ScraperRunRequestSchema.safeParse(req.body);
+    const runConfig: ScraperRunRequestType = parseResult.success
+      ? parseResult.data
+      : { country: 'SE', maxItems: 50 };
+
+    logger.info('Starting Indeed scraper run', { config: runConfig });
+
+    // 1. Fetch jobs from Indeed via Apify
+    const { jobs } = await runIndeedFetch({
+      keywords: runConfig.keywords,
+      exclusionKeywords: runConfig.exclusionKeywords,
+      country: runConfig.country,
+      maxItems: runConfig.maxItems,
+    });
+
+    // 2. Process jobs through the pipeline
+    const result = await runJobProcessingPipeline(jobs, 'indeed');
+
+    // 3. Send email digest (don't wait, don't fail if it errors)
+    sendJobScraperDigestEmail(result).catch((err) => {
+      logger.error('Failed to send scraper digest email', err);
+    });
+
+    const processingTime = Date.now() - startTime;
+
+    logger.info('Indeed scraper run complete', {
+      runId: result.runId,
+      processingTime,
+      stats: result.stats,
+    });
+
+    return res.status(200).json({
+      success: true,
+      runId: result.runId,
+      processingTime,
+      stats: result.stats,
+      summary: {
+        newJobsFound: result.stats.afterDedup,
+        validJobs: result.stats.valid,
+        discardedJobs: result.stats.discarded,
+        errors: result.stats.errors,
+      },
+    });
+  } catch (error) {
+    const processingTime = Date.now() - startTime;
+    logger.error('Indeed scraper run failed', error, { processingTime });
+
+    return res.status(500).json({
+      success: false,
+      error: getErrorMessage(error),
+      processingTime,
+    });
+  }
+});
+
+/**
+ * POST /api/scraping/jobs/cleanup
+ * Clean up old jobs from the database
+ */
+router.post('/cleanup', async (_req: Request, res: Response) => {
+  try {
+    const sources = ['indeed', 'linkedin', 'arbetsformedlingen'] as const;
+    const retentionDays = config.scraper.retentionDays;
+
+    const results: Record<string, number> = {};
+    let totalDeleted = 0;
+
+    for (const source of sources) {
+      try {
+        const deleted = await deleteOldJobsBySource(source, retentionDays);
+        results[source] = deleted;
+        totalDeleted += deleted;
+      } catch (err) {
+        logger.error(`Failed to cleanup ${source} jobs`, err);
+        results[source] = 0;
+      }
+    }
+
+    logger.info('Job cleanup complete', { results, totalDeleted, retentionDays });
+
+    return res.status(200).json({
+      success: true,
+      retentionDays,
+      deletedBySource: results,
+      totalDeleted,
+    });
+  } catch (error) {
+    logger.error('Job cleanup failed', error);
+
+    return res.status(500).json({
+      success: false,
+      error: getErrorMessage(error),
+    });
+  }
+});
+
+/**
+ * GET /api/scraping/jobs/health
+ * Health check for scraper endpoints
+ */
+router.get('/health', (_req: Request, res: Response) => {
+  res.status(200).json({
+    success: true,
+    enabled: config.scraper.enabled,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+export default router;

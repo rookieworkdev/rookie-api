@@ -9,6 +9,12 @@ import type {
   NormalizedCompanyData,
   JobAdData,
 } from '../types/index.js';
+import type { NormalizedJob, JobEvaluationResult } from '../types/scraper.types.js';
+import {
+  JOB_EVALUATION_SYSTEM_PROMPT,
+  generateJobEvaluationUserPrompt,
+  JobEvaluationResponseSchema,
+} from '../prompts/jobEvaluation.prompt.js';
 
 // Zod schemas for AI response validation
 const AIScoreResultSchema = z.object({
@@ -413,4 +419,146 @@ Return ONLY valid JSON in this format:
     logger.error('Error generating job ad', error);
     throw new Error(`Job ad generation failed: ${getErrorMessage(error)}`);
   }
+}
+
+// ============================================================================
+// JOB EVALUATION (for scraped jobs via OpenRouter)
+// ============================================================================
+
+// OpenRouter client (uses OpenAI-compatible API)
+const openRouterClient = config.openRouter.apiKey
+  ? new OpenAI({
+      apiKey: config.openRouter.apiKey,
+      baseURL: 'https://openrouter.ai/api/v1',
+    })
+  : null;
+
+/**
+ * Evaluates a scraped job using OpenRouter AI
+ * Replicates the "Main AI Agent" node from n8n workflow
+ */
+export async function evaluateJob(job: NormalizedJob): Promise<JobEvaluationResult> {
+  const client = openRouterClient || openai;
+  const model = config.openRouter.apiKey ? config.openRouter.primaryModel : config.openai.model;
+
+  try {
+    logger.info('Evaluating job with AI', { title: job.title, company: job.company });
+
+    const userPrompt = generateJobEvaluationUserPrompt(job);
+
+    const response = await client.chat.completions.create({
+      model,
+      messages: [
+        { role: 'system', content: JOB_EVALUATION_SYSTEM_PROMPT },
+        { role: 'user', content: userPrompt },
+      ],
+      temperature: 0.3, // Lower temperature for more consistent evaluations
+    });
+
+    const content = response.choices[0].message.content;
+
+    if (!content) {
+      throw new Error('No content in AI response');
+    }
+
+    // Parse the response (remove markdown code blocks if present)
+    const cleanContent = content
+      .replace(/^```json\s*/i, '')
+      .replace(/\s*```\s*$/, '')
+      .trim();
+
+    const jsonParsed = JSON.parse(cleanContent);
+    const validated = JobEvaluationResponseSchema.safeParse(jsonParsed);
+
+    if (!validated.success) {
+      logger.error('Job evaluation response validation failed', {
+        errors: validated.error.errors,
+        rawContent: cleanContent.substring(0, 500),
+      });
+      throw new Error(`Invalid AI response structure: ${validated.error.message}`);
+    }
+
+    const result: JobEvaluationResult = {
+      isValid: validated.data.isValid,
+      score: validated.data.score,
+      category: validated.data.category,
+      experience: validated.data.experience,
+      experienceLogic: validated.data.experience_logic,
+      reasoning: validated.data.reasoning,
+      applicationEmail: validated.data.applicationEmail,
+      duration: validated.data.duration,
+    };
+
+    logger.info('Job evaluation complete', {
+      title: job.title,
+      isValid: result.isValid,
+      score: result.score,
+      category: result.category,
+    });
+
+    return result;
+  } catch (error) {
+    // Try fallback model if primary fails and we're using OpenRouter
+    if (openRouterClient && model === config.openRouter.primaryModel) {
+      logger.warn('Primary model failed, trying fallback', { error: getErrorMessage(error) });
+      try {
+        return await evaluateJobWithFallback(job);
+      } catch (fallbackError) {
+        logger.error('Fallback model also failed', fallbackError);
+        throw new Error(`Job evaluation failed: ${getErrorMessage(fallbackError)}`);
+      }
+    }
+
+    logger.error('Error evaluating job', error);
+    throw new Error(`Job evaluation failed: ${getErrorMessage(error)}`);
+  }
+}
+
+/**
+ * Evaluate job with fallback model
+ */
+async function evaluateJobWithFallback(job: NormalizedJob): Promise<JobEvaluationResult> {
+  if (!openRouterClient) {
+    throw new Error('OpenRouter not configured for fallback');
+  }
+
+  const userPrompt = generateJobEvaluationUserPrompt(job);
+
+  const response = await openRouterClient.chat.completions.create({
+    model: config.openRouter.fallbackModel,
+    messages: [
+      { role: 'system', content: JOB_EVALUATION_SYSTEM_PROMPT },
+      { role: 'user', content: userPrompt },
+    ],
+    temperature: 0.3,
+  });
+
+  const content = response.choices[0].message.content;
+
+  if (!content) {
+    throw new Error('No content in fallback AI response');
+  }
+
+  const cleanContent = content
+    .replace(/^```json\s*/i, '')
+    .replace(/\s*```\s*$/, '')
+    .trim();
+
+  const jsonParsed = JSON.parse(cleanContent);
+  const validated = JobEvaluationResponseSchema.safeParse(jsonParsed);
+
+  if (!validated.success) {
+    throw new Error(`Invalid fallback AI response: ${validated.error.message}`);
+  }
+
+  return {
+    isValid: validated.data.isValid,
+    score: validated.data.score,
+    category: validated.data.category,
+    experience: validated.data.experience,
+    experienceLogic: validated.data.experience_logic,
+    reasoning: validated.data.reasoning,
+    applicationEmail: validated.data.applicationEmail,
+    duration: validated.data.duration,
+  };
 }

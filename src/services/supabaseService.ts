@@ -239,3 +239,239 @@ export async function createJobAdRecord(
     throw new Error(`Failed to create job ad record: ${getErrorMessage(error)}`);
   }
 }
+
+// ============================================================================
+// SCRAPER-SPECIFIC OPERATIONS
+// ============================================================================
+
+import type {
+  NormalizedJob,
+  JobEvaluationResult,
+  ExtractedContact,
+  JobScraperSource,
+} from '../types/scraper.types.js';
+
+/**
+ * Find existing jobs by external_id or url for deduplication
+ */
+export async function findExistingJobsBySource(
+  source: JobScraperSource
+): Promise<Set<string>> {
+  try {
+    logger.info('Fetching existing jobs for deduplication', { source });
+
+    const { data, error } = await supabase
+      .from('job_ads')
+      .select('external_id, url')
+      .eq('source', source);
+
+    if (error) {
+      throw error;
+    }
+
+    // Create a set of external_ids and urls for fast lookup
+    const existingIds = new Set<string>();
+    for (const job of data || []) {
+      if (job.external_id) existingIds.add(job.external_id);
+      if (job.url) existingIds.add(job.url);
+    }
+
+    logger.info('Fetched existing jobs', { source, count: existingIds.size });
+
+    return existingIds;
+  } catch (error) {
+    logger.error('Error fetching existing jobs', error);
+    throw new Error(`Failed to fetch existing jobs: ${getErrorMessage(error)}`);
+  }
+}
+
+/**
+ * Create a job ad record from a scraped job
+ */
+export async function createJobAdFromScraper(
+  job: NormalizedJob,
+  companyId: string,
+  evaluation: JobEvaluationResult
+): Promise<{ id: string; company_id: string }> {
+  try {
+    logger.info('Creating job ad from scraper', { title: job.title, source: job.source });
+
+    const { data, error } = await supabase
+      .from('job_ads')
+      .insert({
+        company_id: companyId,
+        title: job.title,
+        description: job.description,
+        source: job.source,
+        external_id: job.externalId,
+        url: job.url,
+        external_url: job.url,
+        location: job.location,
+        job_type: job.jobType,
+        posted_date: job.postedAt,
+        salary: job.salary,
+        ai_valid: evaluation.isValid,
+        ai_score: evaluation.score,
+        ai_reasoning: evaluation.reasoning,
+        ai_category: evaluation.category,
+        ai_experience: evaluation.experience,
+        application_email: evaluation.applicationEmail !== 'Email Not Found' ? evaluation.applicationEmail : null,
+        duration: evaluation.duration,
+        raw_data: job.rawData,
+        is_ai_generated: false,
+        published_status: 'scraped',
+      })
+      .select('id, company_id')
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    logger.info('Job ad created from scraper', { jobId: data.id, source: job.source });
+
+    return data;
+  } catch (error) {
+    logger.error('Error creating job ad from scraper', error);
+    throw new Error(`Failed to create job ad from scraper: ${getErrorMessage(error)}`);
+  }
+}
+
+/**
+ * Create a signal for a scraped job ad
+ */
+export async function createSignalForJobAd(
+  companyId: string,
+  jobAdId: string,
+  job: NormalizedJob,
+  evaluation: JobEvaluationResult
+): Promise<{ id: string }> {
+  try {
+    logger.info('Creating signal for job ad', { companyId, jobAdId, source: job.source });
+
+    const signalType = `${job.source}_job_ad`;
+
+    const { data, error } = await supabase
+      .from('signals')
+      .insert({
+        company_id: companyId,
+        signal_type: signalType,
+        source: job.source,
+        signal_date: job.postedAt ? new Date(job.postedAt).toISOString() : new Date().toISOString(),
+        payload: {
+          job_ad_id: jobAdId,
+          title: job.title,
+          score: evaluation.score,
+          valid: evaluation.isValid,
+          company: job.company,
+          location: job.location,
+          description: job.description?.substring(0, 500),
+          url: job.url,
+          duration: evaluation.duration,
+          applicationEmail: evaluation.applicationEmail,
+          reasoning: evaluation.reasoning,
+        },
+      })
+      .select('id')
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    logger.info('Signal created for job ad', { signalId: data.id });
+
+    return data;
+  } catch (error) {
+    logger.error('Error creating signal for job ad', error);
+    throw new Error(`Failed to create signal for job ad: ${getErrorMessage(error)}`);
+  }
+}
+
+/**
+ * Upsert a contact extracted from a scraped job
+ */
+export async function upsertScrapedContact(contact: ExtractedContact): Promise<{ id: string } | null> {
+  try {
+    // Skip if no email
+    if (!contact.email) {
+      return null;
+    }
+
+    logger.info('Upserting scraped contact', { email: maskEmail(contact.email) });
+
+    const { data, error } = await supabase
+      .from('contacts')
+      .upsert(
+        {
+          company_id: contact.companyId,
+          first_name: contact.firstName,
+          last_name: contact.lastName,
+          full_name: contact.fullName,
+          title: contact.title,
+          email: contact.email.toLowerCase().trim(),
+          linkedin_url: contact.linkedinUrl,
+          source: contact.source,
+          source_method: contact.sourceMethod,
+          related_job_ad_id: contact.relatedJobAdId,
+        },
+        {
+          onConflict: 'company_id,email',
+          ignoreDuplicates: false,
+        }
+      )
+      .select('id')
+      .single();
+
+    if (error) {
+      // Ignore unique constraint violations (duplicate contacts)
+      if (error.code === '23505') {
+        logger.debug('Contact already exists, skipping', { email: maskEmail(contact.email) });
+        return null;
+      }
+      throw error;
+    }
+
+    logger.info('Scraped contact upserted', { contactId: data.id });
+
+    return data;
+  } catch (error) {
+    logger.error('Error upserting scraped contact', error);
+    // Don't throw - contact upsert failures shouldn't break the pipeline
+    return null;
+  }
+}
+
+/**
+ * Delete old jobs by source (cleanup)
+ */
+export async function deleteOldJobsBySource(
+  source: JobScraperSource,
+  olderThanDays: number
+): Promise<number> {
+  try {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
+
+    logger.info('Deleting old jobs', { source, olderThanDays, cutoffDate: cutoffDate.toISOString() });
+
+    const { data, error } = await supabase
+      .from('job_ads')
+      .delete()
+      .eq('source', source)
+      .lt('posted_date', cutoffDate.toISOString().split('T')[0])
+      .select('id');
+
+    if (error) {
+      throw error;
+    }
+
+    const deletedCount = data?.length || 0;
+    logger.info('Old jobs deleted', { source, deletedCount });
+
+    return deletedCount;
+  } catch (error) {
+    logger.error('Error deleting old jobs', error);
+    throw new Error(`Failed to delete old jobs: ${getErrorMessage(error)}`);
+  }
+}

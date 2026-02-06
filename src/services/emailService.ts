@@ -2,6 +2,7 @@ import { Resend } from 'resend';
 import { config } from '../config/env.js';
 import { logger, getErrorMessage, maskEmail } from '../utils/logger.js';
 import type { FormData, JobAdData, EmailResponse } from '../types/index.js';
+import type { ScraperRunResult, ProcessedJob } from '../types/scraper.types.js';
 
 const resend = new Resend(config.resend.apiKey);
 
@@ -387,6 +388,243 @@ export async function sendAdminAlert(
   } catch (err) {
     logger.error('Error sending admin alert email', err);
     // Don't throw - we don't want alert failures to break the flow
+    return null;
+  }
+}
+
+// ============================================================================
+// SCRAPER DIGEST EMAIL
+// ============================================================================
+
+/**
+ * Format a date for display
+ */
+function formatDate(date: Date): string {
+  return date.toLocaleDateString('sv-SE', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+/**
+ * Generate HTML for a job row in the digest table
+ */
+function generateJobRow(job: ProcessedJob, index: number, isValid: boolean): string {
+  const bg = index % 2 === 0 ? '#ffffff' : '#f9f9f9';
+  const scoreColor = isValid ? '#e3f2fd' : '#ffebee';
+
+  return `
+    <tr style="background-color: ${bg}; border-bottom: 1px solid #eee;">
+      <td style="padding: 8px;">
+        <div style="font-weight: bold;">${job.job.title}</div>
+        <div style="font-size: 11px; color: #666;">${job.job.jobType || ''}</div>
+      </td>
+      <td style="padding: 8px;">
+        <div>${job.job.company}</div>
+        <div style="font-size: 11px; color: #666;">${job.job.location}</div>
+      </td>
+      <td style="padding: 8px;">
+        <span style="display: inline-block; background: ${scoreColor}; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: bold;">
+          Score: ${job.evaluation.score}
+        </span>
+        <div style="font-size: 11px; color: #888; margin-top: 4px;">${job.evaluation.category}</div>
+      </td>
+      <td style="padding: 8px;">
+        <div style="font-size: 12px; color: #666; max-width: 300px;">
+          ${job.evaluation.reasoning.substring(0, 150)}${job.evaluation.reasoning.length > 150 ? '...' : ''}
+        </div>
+      </td>
+      <td style="padding: 8px;">
+        ${job.job.url ? `<a href="${job.job.url}" target="_blank" style="color: #1565c0; font-size: 12px;">View</a>` : ''}
+      </td>
+    </tr>
+  `;
+}
+
+/**
+ * Generate the scraper digest HTML email
+ */
+function generateScraperDigestHTML(result: ScraperRunResult): string {
+  const date = formatDate(result.startTime);
+  const durationSec = (result.duration / 1000).toFixed(1);
+
+  let validJobsHtml = '';
+  if (result.validJobs.length > 0) {
+    validJobsHtml = `
+      <h3 style="color: #2e7d32; margin-top: 24px;">Valid Jobs (${result.validJobs.length})</h3>
+      <table style="width: 100%; border-collapse: collapse; border: 1px solid #ccc; margin-bottom: 24px;">
+        <thead>
+          <tr style="background-color: #f2f2f2;">
+            <th style="padding: 8px; text-align: left;">Role</th>
+            <th style="padding: 8px; text-align: left;">Company</th>
+            <th style="padding: 8px; text-align: left;">Score</th>
+            <th style="padding: 8px; text-align: left;">Reasoning</th>
+            <th style="padding: 8px; text-align: left;">Link</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${result.validJobs.map((job, i) => generateJobRow(job, i, true)).join('')}
+        </tbody>
+      </table>
+    `;
+  } else {
+    validJobsHtml = '<p style="color: #666;">No valid jobs found in this run.</p>';
+  }
+
+  let discardedJobsHtml = '';
+  if (result.discardedJobs.length > 0) {
+    discardedJobsHtml = `
+      <h3 style="color: #c0392b; margin-top: 24px;">Discarded Jobs (${result.discardedJobs.length})</h3>
+      <table style="width: 100%; border-collapse: collapse; border: 1px solid #ccc; margin-bottom: 24px;">
+        <thead>
+          <tr style="background-color: #f2f2f2;">
+            <th style="padding: 8px; text-align: left;">Role</th>
+            <th style="padding: 8px; text-align: left;">Company</th>
+            <th style="padding: 8px; text-align: left;">Score</th>
+            <th style="padding: 8px; text-align: left;">Reasoning</th>
+            <th style="padding: 8px; text-align: left;">Link</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${result.discardedJobs.map((job, i) => generateJobRow(job, i, false)).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+
+  let errorsHtml = '';
+  if (result.errors.length > 0) {
+    errorsHtml = `
+      <h3 style="color: #d32f2f; margin-top: 24px;">Errors (${result.errors.length})</h3>
+      <ul style="background: #ffebee; padding: 16px 32px; border-radius: 4px;">
+        ${result.errors.slice(0, 10).map((e) => `<li>${e.job?.title || 'Unknown'}: ${e.error}</li>`).join('')}
+        ${result.errors.length > 10 ? `<li>... and ${result.errors.length - 10} more</li>` : ''}
+      </ul>
+    `;
+  }
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      font-size: 13px;
+      color: #333;
+      line-height: 1.5;
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    .header {
+      border-bottom: 2px solid #333;
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+    }
+    .stats {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 24px;
+    }
+    .stat-box {
+      background: #f5f5f5;
+      padding: 12px 20px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .stat-number {
+      font-size: 24px;
+      font-weight: bold;
+      color: #1565c0;
+    }
+    .stat-label {
+      font-size: 11px;
+      color: #666;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2 style="margin: 0;">Job Scraper Digest - ${result.source.charAt(0).toUpperCase() + result.source.slice(1)}</h2>
+      <p style="margin: 5px 0 0 0; color: #666;">${date} | Duration: ${durationSec}s</p>
+    </div>
+
+    <div class="stats">
+      <div class="stat-box">
+        <div class="stat-number">${result.stats.fetched}</div>
+        <div class="stat-label">Fetched</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-number">${result.stats.afterDedup}</div>
+        <div class="stat-label">New Jobs</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-number" style="color: #2e7d32;">${result.stats.valid}</div>
+        <div class="stat-label">Valid</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-number" style="color: #c0392b;">${result.stats.discarded}</div>
+        <div class="stat-label">Discarded</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-number" style="color: #d32f2f;">${result.stats.errors}</div>
+        <div class="stat-label">Errors</div>
+      </div>
+    </div>
+
+    ${validJobsHtml}
+    ${discardedJobsHtml}
+    ${errorsHtml}
+
+    <div style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 10px; text-align: center; font-size: 11px; color: #999;">
+      Run ID: ${result.runId} | Generated by Rookie Job Scraper
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+/**
+ * Sends the job scraper digest email
+ */
+export async function sendJobScraperDigestEmail(result: ScraperRunResult): Promise<EmailResponse | null> {
+  try {
+    const recipient = config.adminAlert?.email || 'rookiework.dev@gmail.com';
+
+    logger.info('Sending job scraper digest email', {
+      source: result.source,
+      recipient,
+      validJobs: result.stats.valid,
+      discardedJobs: result.stats.discarded,
+    });
+
+    const { data, error } = await resend.emails.send({
+      from: config.resend.fromEmail,
+      to: recipient,
+      subject: `Job Scraper: ${result.stats.valid} new ${result.source} jobs (${result.stats.afterDedup} processed)`,
+      html: generateScraperDigestHTML(result),
+    });
+
+    if (error) {
+      logger.error('Failed to send scraper digest email', error);
+      return null;
+    }
+
+    logger.info('Scraper digest email sent', { emailId: data?.id });
+
+    return data as EmailResponse;
+  } catch (err) {
+    logger.error('Error sending scraper digest email', err);
     return null;
   }
 }
