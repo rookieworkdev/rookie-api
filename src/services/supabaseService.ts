@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { config } from '../config/env.js';
-import { logger, getErrorMessage } from '../utils/logger.js';
+import { logger, getErrorMessage, maskEmail } from '../utils/logger.js';
 import type {
   FormData,
   AIScoreResult,
@@ -91,7 +91,7 @@ export async function insertRejectedLead(
   aiReasoning: string = 'N/A (Fast Reject)'
 ): Promise<RejectedLeadRecord> {
   try {
-    logger.info('Inserting rejected lead', { email: leadData.email, classification });
+    logger.info('Inserting rejected lead', { email: maskEmail(leadData.email), classification });
 
     const { data, error } = await supabase
       .from('rejected_leads')
@@ -130,7 +130,7 @@ export async function insertCandidateLead(
   aiData: AIScoreResult
 ): Promise<CandidateLeadRecord> {
   try {
-    logger.info('Inserting candidate lead', { email: leadData.email });
+    logger.info('Inserting candidate lead', { email: maskEmail(leadData.email) });
 
     const { data, error } = await supabase
       .from('candidate_leads')
@@ -165,7 +165,7 @@ export async function insertCandidateLead(
  */
 export async function upsertContact(contactData: ContactData): Promise<ContactRecord> {
   try {
-    logger.info('Upserting contact', { email: contactData.email });
+    logger.info('Upserting contact', { email: maskEmail(contactData.email) });
 
     const { data, error } = await supabase
       .from('contacts')

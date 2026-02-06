@@ -1,6 +1,6 @@
 import { Resend } from 'resend';
 import { config } from '../config/env.js';
-import { logger, getErrorMessage } from '../utils/logger.js';
+import { logger, getErrorMessage, maskEmail } from '../utils/logger.js';
 import type { FormData, JobAdData, EmailResponse } from '../types/index.js';
 
 const resend = new Resend(config.resend.apiKey);
@@ -203,7 +203,7 @@ export async function sendEmailToLead(
   jobAd: JobAdData
 ): Promise<EmailResponse> {
   try {
-    logger.info('Sending email to lead via Resend', { email: leadEmail });
+    logger.info('Sending email to lead via Resend', { email: maskEmail(leadEmail) });
 
     // For testing without verified domain, send to Rookie account only
     // Original lead email included in subject for tracking

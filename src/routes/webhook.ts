@@ -1,5 +1,5 @@
 import express, { Request, Response, Router } from 'express';
-import { logger, getErrorMessage } from '../utils/logger.js';
+import { logger, getErrorMessage, maskEmail } from '../utils/logger.js';
 import {
   validateLead,
   extractDomain,
@@ -33,6 +33,25 @@ const router: Router = express.Router();
  * Main webhook handler
  * Replicates the entire N8n flow
  */
+/**
+ * Masks PII fields for GDPR-compliant logging while preserving structure visibility
+ */
+function maskPiiForLogging(body: Record<string, unknown>): Record<string, unknown> {
+  const masked = { ...body };
+
+  if (typeof masked.name === 'string') {
+    masked.name = masked.name.length > 0 ? `[REDACTED:${masked.name.length}chars]` : '[EMPTY]';
+  }
+  if (typeof masked.email === 'string') {
+    masked.email = maskEmail(masked.email);
+  }
+  if (typeof masked.phone === 'string') {
+    masked.phone = masked.phone.length > 0 ? `[REDACTED:${masked.phone.length}chars]` : '[EMPTY]';
+  }
+
+  return masked;
+}
+
 router.post('/webhook', verifyWebhookSignature, async (req: Request, res: Response) => {
   const startTime = Date.now();
 
@@ -40,7 +59,7 @@ router.post('/webhook', verifyWebhookSignature, async (req: Request, res: Respon
   let formData: FormData | undefined;
 
   try {
-    logger.info('Webhook received', { body: req.body });
+    logger.info('Webhook received', { body: maskPiiForLogging(req.body) });
 
     // Step 1: Validate request body with zod
     const validationResult = parseWebhookRequest(req.body);
@@ -72,7 +91,7 @@ router.post('/webhook', verifyWebhookSignature, async (req: Request, res: Respon
       subject: validatedBody.subject,
     };
 
-    logger.info('Form data structured', { email: formData.email });
+    logger.info('Form data structured', { email: maskEmail(formData.email) });
 
     // Step 2: Lead Data Validation - Validate and check for spam
     const validatedData = validateLead(formData);

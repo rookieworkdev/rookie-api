@@ -1,5 +1,31 @@
 import type { LogMeta } from '../types/index.js';
 
+/**
+ * Masks email for GDPR-compliant logging
+ * Shows domain for debugging while hiding the local part
+ * e.g., "john.doe@company.com" → "j***@company.com"
+ */
+export function maskEmail(email: string | undefined | null): string {
+  if (!email) return '[NO_EMAIL]';
+  const parts = email.split('@');
+  if (parts.length !== 2) return '[INVALID_EMAIL]';
+  const [local, domain] = parts;
+  const masked = local.length > 0 ? `${local[0]}***` : '***';
+  return `${masked}@${domain}`;
+}
+
+/**
+ * Masks phone for GDPR-compliant logging
+ * Shows last 4 digits for debugging
+ * e.g., "+46701234567" → "***4567"
+ */
+export function maskPhone(phone: string | undefined | null): string {
+  if (!phone) return '[NO_PHONE]';
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length < 4) return '[REDACTED]';
+  return `***${digits.slice(-4)}`;
+}
+
 interface LogEntry {
   level: string;
   message: string;
