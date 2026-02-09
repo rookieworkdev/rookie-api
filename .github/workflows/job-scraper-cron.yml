@@ -29,7 +29,7 @@ jobs:
         run: |
           echo "Starting Indeed job scraper..."
 
-          response=$(curl -s -w "\n%{http_code}" -X POST \
+          response=$(curl -s -L -w "\n%{http_code}" -X POST \
             "${{ secrets.API_BASE_URL }}/api/scraping/jobs/indeed" \
             -H "Content-Type: application/json" \
             -H "X-API-Key: ${{ secrets.SCRAPER_API_KEY }}" \
@@ -58,7 +58,7 @@ jobs:
         run: |
           echo "Starting job cleanup..."
 
-          response=$(curl -s -w "\n%{http_code}" -X POST \
+          response=$(curl -s -L -w "\n%{http_code}" -X POST \
             "${{ secrets.API_BASE_URL }}/api/scraping/jobs/cleanup" \
             -H "Content-Type: application/json" \
             -H "X-API-Key: ${{ secrets.SCRAPER_API_KEY }}")
