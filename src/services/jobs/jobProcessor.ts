@@ -8,7 +8,7 @@ import {
   createSignalForJobAd,
   upsertScrapedContact,
 } from '../supabaseService.js';
-import { guessCompanyDomain } from './indeedJobScraper.js';
+import { guessCompanyDomain } from './scraperUtils.js';
 import type {
   NormalizedJob,
   JobEvaluationResult,

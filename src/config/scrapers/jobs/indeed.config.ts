@@ -22,17 +22,3 @@ export const indeedConfig: IndeedScraperConfig = {
 // Default keywords for Indeed search (can be overridden via API)
 export const defaultIndeedKeywords = `nyexad OR nyexaminerad OR nyutbildad OR junior OR graduate OR karriärstart OR entry level OR assistent OR ekonom OR ingenjör OR engineer OR developer OR utvecklare OR finans OR finance OR redovisning OR accounting OR tech OR tekniker OR software OR data OR analytics OR logistik OR logistics OR inköp OR sales OR säljare OR marketing OR konsult OR juridik OR jurist OR administration OR administratör OR kundtjänst OR customer service OR support OR HR`;
 
-// Default exclusion keywords
-export const defaultExclusionKeywords = [
-  'lärare',
-  'undersköterska',
-  'sjuksköterska',
-  'läkare',
-  'snickare',
-  'hantverkare',
-  'städare',
-  'lokalvård',
-  'kock',
-  'servitör',
-  'bartender',
-];
