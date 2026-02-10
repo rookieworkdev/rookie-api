@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import { config } from '../config/env.js';
 import { logger, getErrorMessage } from '../utils/logger.js';
 import { runIndeedFetch } from '../services/jobs/indeedJobScraper.js';
@@ -16,17 +17,27 @@ function verifyScraperApiKey(req: Request, res: Response, next: NextFunction): v
   const apiKey = req.headers['x-api-key'];
 
   if (!config.scraper.apiKey) {
-    logger.warn('Scraper API key not configured, allowing request');
+    if (config.nodeEnv === 'production') {
+      logger.error('Scraper API key not configured in production');
+      res.status(500).json({ success: false, error: 'Scraper API key not configured' });
+      return;
+    }
+    logger.warn('Scraper API key not configured, allowing request in non-production');
     next();
     return;
   }
 
-  if (!apiKey || apiKey !== config.scraper.apiKey) {
-    logger.warn('Invalid or missing scraper API key');
-    res.status(401).json({
-      success: false,
-      error: 'Invalid or missing API key',
-    });
+  if (!apiKey || typeof apiKey !== 'string') {
+    logger.warn('Missing scraper API key');
+    res.status(401).json({ success: false, error: 'Invalid or missing API key' });
+    return;
+  }
+
+  const expected = Buffer.from(config.scraper.apiKey);
+  const provided = Buffer.from(apiKey);
+  if (expected.length !== provided.length || !crypto.timingSafeEqual(expected, provided)) {
+    logger.warn('Invalid scraper API key');
+    res.status(401).json({ success: false, error: 'Invalid or missing API key' });
     return;
   }
 
