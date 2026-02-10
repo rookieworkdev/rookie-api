@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { config } from '../config/env.js';
 import { logger, getErrorMessage } from '../utils/logger.js';
 import { runIndeedFetch } from '../services/jobs/indeedJobScraper.js';
+import { runLinkedInFetch } from '../services/jobs/linkedinJobScraper.js';
 import { runJobProcessingPipeline } from '../services/jobs/jobProcessor.js';
 import { deleteOldJobsBySource } from '../services/supabaseService.js';
 import { sendJobScraperDigestEmail } from '../services/emailService.js';
@@ -121,6 +122,77 @@ router.post('/indeed', async (req: Request, res: Response) => {
   } catch (error) {
     const processingTime = Date.now() - startTime;
     logger.error('Indeed scraper run failed', error, { processingTime });
+
+    return res.status(500).json({
+      success: false,
+      error: getErrorMessage(error),
+      processingTime,
+    });
+  }
+});
+
+/**
+ * POST /api/scraping/jobs/linkedin
+ * Run the LinkedIn job scraper
+ */
+router.post('/linkedin', async (req: Request, res: Response) => {
+  const startTime = Date.now();
+
+  try {
+    if (!config.scraper.enabled) {
+      return res.status(503).json({
+        success: false,
+        error: 'Scraper is disabled',
+      });
+    }
+
+    // Parse and validate request body
+    const parseResult = ScraperRunRequestSchema.safeParse(req.body);
+    const runConfig: ScraperRunRequestType = parseResult.success
+      ? parseResult.data
+      : { country: 'SE', maxItems: 10 };
+
+    logger.info('Starting LinkedIn scraper run', { config: runConfig });
+
+    // 1. Fetch jobs from LinkedIn via Apify (all categories)
+    const { jobs } = await runLinkedInFetch({
+      keywords: runConfig.keywords,
+      exclusionKeywords: runConfig.exclusionKeywords,
+      country: runConfig.country,
+      maxItems: runConfig.maxItems,
+    });
+
+    // 2. Process jobs through the pipeline
+    const result = await runJobProcessingPipeline(jobs, 'linkedin');
+
+    // 3. Send email digest (don't wait, don't fail if it errors)
+    sendJobScraperDigestEmail(result).catch((err) => {
+      logger.error('Failed to send scraper digest email', err);
+    });
+
+    const processingTime = Date.now() - startTime;
+
+    logger.info('LinkedIn scraper run complete', {
+      runId: result.runId,
+      processingTime,
+      stats: result.stats,
+    });
+
+    return res.status(200).json({
+      success: true,
+      runId: result.runId,
+      processingTime,
+      stats: result.stats,
+      summary: {
+        newJobsFound: result.stats.afterDedup,
+        validJobs: result.stats.valid,
+        discardedJobs: result.stats.discarded,
+        errors: result.stats.errors,
+      },
+    });
+  } catch (error) {
+    const processingTime = Date.now() - startTime;
+    logger.error('LinkedIn scraper run failed', error, { processingTime });
 
     return res.status(500).json({
       success: false,
