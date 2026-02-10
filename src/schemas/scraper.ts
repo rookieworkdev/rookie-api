@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { logger } from '../utils/logger.js';
 
 // Schema for raw Indeed job from Apify
 // Note: Using lenient validation because Apify can return various formats
@@ -65,24 +66,14 @@ export type ScraperRunRequestType = z.infer<typeof ScraperRunRequestSchema>;
 export function parseRawIndeedJobs(data: unknown[]): z.infer<typeof RawIndeedJobSchema>[] {
   const results: z.infer<typeof RawIndeedJobSchema>[] = [];
 
-  // Debug: log first item's full structure to understand Apify response
-  if (data.length > 0) {
-    console.log('[DEBUG] First raw Apify item:', JSON.stringify(data[0], null, 2));
-  }
-
   for (const item of data) {
     const parsed = RawIndeedJobSchema.safeParse(item);
     if (parsed.success) {
       results.push(parsed.data);
-    } else {
-      // Debug: log why validation failed
-      console.log('[DEBUG] Job validation failed:', JSON.stringify(parsed.error.errors, null, 2));
-      const itemObj = item as Record<string, unknown>;
-      console.log('[DEBUG] Failed item - id:', itemObj.id, 'positionName:', itemObj.positionName, 'url:', itemObj.url);
     }
   }
 
-  console.log(`[DEBUG] Parsed ${results.length}/${data.length} jobs successfully`);
+  logger.debug('Parsed raw Indeed jobs', { parsed: results.length, total: data.length });
 
   return results;
 }

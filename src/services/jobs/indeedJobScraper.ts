@@ -17,9 +17,6 @@ export async function fetchIndeedJobs(runConfig?: ScraperRunConfig): Promise<Raw
     throw new Error('APIFY_API_KEY is not configured');
   }
 
-  // Debug: Log that we have an API key (first 10 chars only for security)
-  console.log('[DEBUG] Apify API key loaded:', config.apify.apiKey?.substring(0, 15) + '...');
-
   const client = new ApifyClient({
     token: config.apify.apiKey,
   });
@@ -27,8 +24,6 @@ export async function fetchIndeedJobs(runConfig?: ScraperRunConfig): Promise<Raw
   const keywords = runConfig?.keywords || config.scraper.keywords || defaultIndeedKeywords;
   const country = runConfig?.country || config.scraper.country || indeedConfig.defaultCountry;
   const maxItems = runConfig?.maxItems || config.scraper.maxItems || indeedConfig.defaultMaxItems;
-
-  console.log('[DEBUG] Starting Apify call with:', { country, maxItems, keywordsLength: keywords.length });
 
   logger.info('Starting Indeed scraper', {
     country,
