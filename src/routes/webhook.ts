@@ -236,7 +236,7 @@ router.post('/webhook', verifyWebhookSignature, async (req: Request, res: Respon
     }
   } catch (error) {
     logger.error('Webhook processing failed', error, {
-      body: req.body,
+      body: maskPiiForLogging(req.body),
       processingTime: Date.now() - startTime,
     });
 
