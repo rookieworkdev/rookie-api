@@ -447,6 +447,130 @@ export async function upsertScrapedContact(contact: ExtractedContact): Promise<{
 }
 
 /**
+ * Update company with LinkedIn enrichment data
+ * Only fills fields that are currently null in the DB (never overwrites existing data)
+ * Non-throwing: enrichment is best-effort
+ */
+export async function updateCompanyEnrichment(
+  companyId: string,
+  data: {
+    linkedinUrl?: string | null;
+    website?: string | null;
+    description?: string | null;
+    employeeCount?: number | null;
+  }
+): Promise<void> {
+  try {
+    // Fetch current company to check which fields are null
+    const { data: company, error: fetchError } = await supabase
+      .from('companies')
+      .select('linkedin_url, website, description, employee_count, company_size')
+      .eq('id', companyId)
+      .single();
+
+    if (fetchError || !company) {
+      logger.error('Failed to fetch company for enrichment', fetchError, { companyId });
+      return;
+    }
+
+    // Build update object: only set fields that are currently null and have incoming values
+    const updates: Record<string, unknown> = {};
+
+    if (!company.linkedin_url && data.linkedinUrl) {
+      updates.linkedin_url = data.linkedinUrl;
+    }
+    if (!company.website && data.website) {
+      updates.website = data.website;
+    }
+    if (!company.description && data.description) {
+      updates.description = data.description;
+    }
+    if (!company.employee_count && data.employeeCount) {
+      updates.employee_count = data.employeeCount;
+    }
+    if (!company.company_size && data.employeeCount) {
+      updates.company_size = String(data.employeeCount);
+    }
+
+    if (Object.keys(updates).length === 0) {
+      logger.debug('No enrichment updates needed', { companyId });
+      return;
+    }
+
+    updates.updated_at = new Date().toISOString();
+
+    const { error: updateError } = await supabase
+      .from('companies')
+      .update(updates)
+      .eq('id', companyId);
+
+    if (updateError) {
+      logger.error('Failed to update company enrichment', updateError, { companyId });
+      return;
+    }
+
+    logger.info('Company enriched with LinkedIn data', {
+      companyId,
+      fieldsUpdated: Object.keys(updates).filter((k) => k !== 'updated_at'),
+    });
+  } catch (error) {
+    logger.error('Error in company enrichment', error, { companyId });
+  }
+}
+
+/**
+ * Upsert a LinkedIn contact (has linkedin_url but may not have email)
+ * Uses on_conflict=company_id,linkedin_url
+ */
+export async function upsertLinkedInContact(contact: ExtractedContact): Promise<{ id: string } | null> {
+  try {
+    if (!contact.linkedinUrl) {
+      return null;
+    }
+
+    logger.info('Upserting LinkedIn contact', { linkedinUrl: contact.linkedinUrl });
+
+    const { data, error } = await supabase
+      .from('contacts')
+      .upsert(
+        {
+          company_id: contact.companyId,
+          first_name: contact.firstName,
+          last_name: contact.lastName,
+          full_name: contact.fullName,
+          title: contact.title,
+          linkedin_url: contact.linkedinUrl,
+          source: contact.source,
+          source_method: contact.sourceMethod,
+          related_job_ad_id: contact.relatedJobAdId,
+        },
+        {
+          onConflict: 'company_id,linkedin_url',
+          ignoreDuplicates: false,
+        }
+      )
+      .select('id')
+      .single();
+
+    if (error) {
+      if (error.code === '23505') {
+        logger.debug('LinkedIn contact already exists, skipping', { linkedinUrl: contact.linkedinUrl });
+        return null;
+      }
+      throw error;
+    }
+
+    logger.info('LinkedIn contact upserted', { contactId: data.id });
+
+    return data;
+  } catch (error) {
+    logger.error('Error upserting LinkedIn contact', error);
+    // Don't throw - contact upsert failures shouldn't break the pipeline
+    return null;
+  }
+}
+
+/**
  * Delete old jobs by source (cleanup)
  */
 export async function deleteOldJobsBySource(

@@ -7,6 +7,8 @@ import {
   createJobAdFromScraper,
   createSignalForJobAd,
   upsertScrapedContact,
+  upsertLinkedInContact,
+  updateCompanyEnrichment,
 } from '../supabaseService.js';
 import { guessCompanyDomain } from './scraperUtils.js';
 import type {
@@ -91,6 +93,50 @@ function extractContactFromJob(
 }
 
 /**
+ * Extract contacts from a LinkedIn job (up to 2: job poster + application email)
+ */
+function extractLinkedInContacts(
+  job: NormalizedJob,
+  evaluation: JobEvaluationResult,
+  companyId: string,
+  jobAdId: string
+): ExtractedContact[] {
+  const contacts: ExtractedContact[] = [];
+  const raw = job.rawData as Record<string, unknown>;
+
+  // Contact 1: Job poster from LinkedIn API data
+  const posterName = raw.jobPosterName as string | undefined;
+  const posterTitle = raw.jobPosterTitle as string | undefined;
+  const posterUrl = raw.jobPosterProfileUrl as string | undefined;
+
+  if (posterName && posterUrl) {
+    const nameParts = posterName.trim().split(/\s+/);
+    const firstName = nameParts[0];
+    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : undefined;
+
+    contacts.push({
+      companyId,
+      firstName,
+      lastName,
+      fullName: posterName.trim(),
+      title: posterTitle || undefined,
+      linkedinUrl: posterUrl,
+      source: 'linkedin_job_ad',
+      sourceMethod: 'api_extracted',
+      relatedJobAdId: jobAdId,
+    });
+  }
+
+  // Contact 2: Application email from AI extraction (same logic as extractContactFromJob)
+  const emailContact = extractContactFromJob(job, evaluation, companyId, jobAdId);
+  if (emailContact) {
+    contacts.push(emailContact);
+  }
+
+  return contacts;
+}
+
+/**
  * Process a single job through the pipeline
  */
 export async function processJob(job: NormalizedJob): Promise<ProcessedJob> {
@@ -118,10 +164,32 @@ export async function processJob(job: NormalizedJob): Promise<ProcessedJob> {
       evaluation
     );
 
-    // 5. Extract and upsert contact (if email found)
-    const contact = extractContactFromJob(job, evaluation, companyId, jobAdResult.id);
-    if (contact) {
-      await upsertScrapedContact(contact);
+    // 5. Extract and upsert contacts (source-aware)
+    if (job.source === 'linkedin') {
+      // LinkedIn: extract job poster + application email contacts
+      const contacts = extractLinkedInContacts(job, evaluation, companyId, jobAdResult.id);
+      for (const contact of contacts) {
+        if (contact.linkedinUrl && !contact.email) {
+          await upsertLinkedInContact(contact);
+        } else if (contact.email) {
+          await upsertScrapedContact(contact);
+        }
+      }
+
+      // LinkedIn: enrich company with LinkedIn data
+      const raw = job.rawData as Record<string, unknown>;
+      await updateCompanyEnrichment(companyId, {
+        linkedinUrl: raw.companyLinkedinUrl as string | undefined,
+        website: raw.companyWebsite as string | undefined,
+        description: raw.companyDescription as string | undefined,
+        employeeCount: raw.companyEmployeesCount as number | undefined,
+      });
+    } else {
+      // Default (Indeed, etc.): extract email contact only
+      const contact = extractContactFromJob(job, evaluation, companyId, jobAdResult.id);
+      if (contact) {
+        await upsertScrapedContact(contact);
+      }
     }
 
     return {
