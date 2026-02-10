@@ -7,6 +7,18 @@ import type { ScraperRunResult, ProcessedJob } from '../types/scraper.types.js';
 const resend = new Resend(config.resend.apiKey);
 
 /**
+ * Escapes HTML special characters to prevent XSS in email templates
+ */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
  * Generates the HTML email template
  */
 function generateEmailHTML(jobAd: JobAdData, companyName: string): string {
@@ -149,8 +161,8 @@ function generateEmailHTML(jobAd: JobAdData, companyName: string): string {
         <h2>Utkast till jobbannons</h2>
         <p>Baserat på din beskrivning har vi skapat ett förslag:</p>
 
-        <h3>${jobAd.title}</h3>
-        <h4>${companyName}</h4>
+        <h3>${escapeHtml(jobAd.title)}</h3>
+        <h4>${escapeHtml(companyName)}</h4>
         <div class="job-description">${jobAd.description}</div>
 
         <p><em>Du kan redigera och slutföra denna annons i företagsportalen.</em></p>
@@ -317,25 +329,25 @@ function generateAdminAlertHTML(
     <div class="section">
       <h2>Felinformation</h2>
       <div class="error-box">
-        <p><strong>Fel vid:</strong> ${failurePoint}</p>
-        <p><strong>Felmeddelande:</strong> ${errorMessage}</p>
+        <p><strong>Fel vid:</strong> ${escapeHtml(failurePoint)}</p>
+        <p><strong>Felmeddelande:</strong> ${escapeHtml(errorMessage)}</p>
         <p><strong>Tidpunkt:</strong> ${new Date().toLocaleString('sv-SE')}</p>
       </div>
     </div>
 
     <div class="section">
       <h2>Formulärdata (sparad i rejected_leads)</h2>
-      <div class="data-item"><strong>Namn:</strong> ${formData.full_name || 'N/A'}</div>
-      <div class="data-item"><strong>E-post:</strong> ${formData.email || 'N/A'}</div>
-      <div class="data-item"><strong>Telefon:</strong> ${formData.phone || 'N/A'}</div>
-      <div class="data-item"><strong>Företag:</strong> ${formData.company_name || 'N/A'}</div>
-      <div class="data-item"><strong>Bransch:</strong> ${formData.industry || 'N/A'}</div>
-      <div class="data-item"><strong>Tjänstetyp:</strong> ${formData.service_type || 'N/A'}</div>
+      <div class="data-item"><strong>Namn:</strong> ${escapeHtml(formData.full_name || 'N/A')}</div>
+      <div class="data-item"><strong>E-post:</strong> ${escapeHtml(formData.email || 'N/A')}</div>
+      <div class="data-item"><strong>Telefon:</strong> ${escapeHtml(formData.phone || 'N/A')}</div>
+      <div class="data-item"><strong>Företag:</strong> ${escapeHtml(formData.company_name || 'N/A')}</div>
+      <div class="data-item"><strong>Bransch:</strong> ${escapeHtml(formData.industry || 'N/A')}</div>
+      <div class="data-item"><strong>Tjänstetyp:</strong> ${escapeHtml(formData.service_type || 'N/A')}</div>
     </div>
 
     <div class="section">
       <h2>Beskrivning av behov</h2>
-      <div class="data-item">${formData.needs_description || 'N/A'}</div>
+      <div class="data-item">${escapeHtml(formData.needs_description || 'N/A')}</div>
     </div>
 
     <div class="footer">
@@ -370,7 +382,7 @@ export async function sendAdminAlert(
     const { data, error: emailError } = await resend.emails.send({
       from: config.resend.fromEmail,
       to: config.adminAlert.email,
-      subject: `🚨 Form Submission Failed - ${formData.company_name || 'Unknown Company'}`,
+      subject: `🚨 Form Submission Failed - ${escapeHtml(formData.company_name || 'Unknown Company')}`,
       html: generateAdminAlertHTML(formData, error, failurePoint),
     });
 
@@ -419,26 +431,26 @@ function generateJobRow(job: ProcessedJob, index: number, isValid: boolean): str
   return `
     <tr style="background-color: ${bg}; border-bottom: 1px solid #eee;">
       <td style="padding: 8px;">
-        <div style="font-weight: bold;">${job.job.title}</div>
-        <div style="font-size: 11px; color: #666;">${job.job.jobType || ''}</div>
+        <div style="font-weight: bold;">${escapeHtml(job.job.title)}</div>
+        <div style="font-size: 11px; color: #666;">${escapeHtml(job.job.jobType || '')}</div>
       </td>
       <td style="padding: 8px;">
-        <div>${job.job.company}</div>
-        <div style="font-size: 11px; color: #666;">${job.job.location}</div>
+        <div>${escapeHtml(job.job.company)}</div>
+        <div style="font-size: 11px; color: #666;">${escapeHtml(job.job.location)}</div>
       </td>
       <td style="padding: 8px;">
         <span style="display: inline-block; background: ${scoreColor}; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: bold;">
           Score: ${job.evaluation.score}
         </span>
-        <div style="font-size: 11px; color: #888; margin-top: 4px;">${job.evaluation.category}</div>
+        <div style="font-size: 11px; color: #888; margin-top: 4px;">${escapeHtml(job.evaluation.category)}</div>
       </td>
       <td style="padding: 8px;">
         <div style="font-size: 12px; color: #666; max-width: 300px;">
-          ${job.evaluation.reasoning.substring(0, 150)}${job.evaluation.reasoning.length > 150 ? '...' : ''}
+          ${escapeHtml(job.evaluation.reasoning.substring(0, 150))}${job.evaluation.reasoning.length > 150 ? '...' : ''}
         </div>
       </td>
       <td style="padding: 8px;">
-        ${job.job.url ? `<a href="${job.job.url}" target="_blank" style="color: #1565c0; font-size: 12px;">View</a>` : ''}
+        ${job.job.url ? `<a href="${encodeURI(job.job.url)}" target="_blank" style="color: #1565c0; font-size: 12px;">View</a>` : ''}
       </td>
     </tr>
   `;
@@ -500,7 +512,7 @@ function generateScraperDigestHTML(result: ScraperRunResult): string {
     errorsHtml = `
       <h3 style="color: #d32f2f; margin-top: 24px;">Errors (${result.errors.length})</h3>
       <ul style="background: #ffebee; padding: 16px 32px; border-radius: 4px;">
-        ${result.errors.slice(0, 10).map((e) => `<li>${e.job?.title || 'Unknown'}: ${e.error}</li>`).join('')}
+        ${result.errors.slice(0, 10).map((e) => `<li>${escapeHtml(e.job?.title || 'Unknown')}: ${escapeHtml(e.error)}</li>`).join('')}
         ${result.errors.length > 10 ? `<li>... and ${result.errors.length - 10} more</li>` : ''}
       </ul>
     `;
