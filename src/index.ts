@@ -26,13 +26,14 @@ app.use(
   })
 );
 
-// Rate limiting - 100 requests per 15 minutes per IP
+// Rate limiting - 100 requests per 15 minutes per IP (skip health checks)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req: Request) => req.path.endsWith('/health'),
 });
 
 app.use(limiter);
