@@ -23,13 +23,16 @@ export async function fetchLinkedInJobs(runConfig?: ScraperRunConfig): Promise<R
     token: config.apify.apiKey,
   });
 
-  const maxItems = runConfig?.maxItems || config.scraper.maxItems || linkedinConfig.defaultMaxItemsPerCategory;
+  const requestedMaxItems = runConfig?.maxItems || config.scraper.maxItems || linkedinConfig.defaultMaxItemsPerCategory;
+  // Apify actor requires count >= 100; clamp to that minimum
+  const maxItems = Math.max(requestedMaxItems, 100);
   const seenIds = new Set<string>();
   const allJobs: RawLinkedInJob[] = [];
 
   logger.info('Starting LinkedIn scraper', {
     categories: linkedinConfig.categories.length,
     maxItemsPerCategory: maxItems,
+    requestedMaxItems,
   });
 
   for (const category of linkedinConfig.categories) {
