@@ -45,7 +45,7 @@ build/
 # Vercel
 .vercel
 
-# Notes
-PRODUCTION_CHECKLIST.md
-TASKS.md
+# Notes and planning docs (all .md except README.md)
+*.md
+!README.md
 .claude
