@@ -134,7 +134,7 @@ export function filterByExclusions(
 export function normalizeCompanyName(company: string): string {
   return company
     .toLowerCase()
-    .replace(/\s+(ab|aktiebolag|sweden|sverige|stockholm|göteborg|malmö)$/gi, '')
+    .replace(/\s+(ab|aktiebolag|sweden|sverige|stockholm|göteborg|malmö)$/g, '')
     .trim();
 }
 

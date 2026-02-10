@@ -323,7 +323,7 @@ function generateAdminAlertHTML(
 <body>
   <div class="container">
     <div class="alert-header">
-      <h1>🚨 Formulärinlämning misslyckades</h1>
+      <h1>Formularinlamning misslyckades</h1>
     </div>
 
     <div class="section">
@@ -382,7 +382,7 @@ export async function sendAdminAlert(
     const { data, error: emailError } = await resend.emails.send({
       from: config.resend.fromEmail,
       to: config.adminAlert.email,
-      subject: `🚨 Form Submission Failed - ${escapeHtml(formData.company_name || 'Unknown Company')}`,
+      subject: `ALERT: Form Submission Failed - ${escapeHtml(formData.company_name || 'Unknown Company')}`,
       html: generateAdminAlertHTML(formData, error, failurePoint),
     });
 

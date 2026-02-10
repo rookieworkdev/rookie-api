@@ -88,20 +88,6 @@ export interface ScraperRunResult {
   errors: Array<{ job?: NormalizedJob; error: string }>;
 }
 
-// Batch processor types
-export interface BatchOptions {
-  concurrency: number;
-  onProgress?: (completed: number, total: number) => void;
-}
-
-export interface BatchResult<T> {
-  successful: T[];
-  failed: Array<{ item: unknown; error: string }>;
-  total: number;
-  successCount: number;
-  failureCount: number;
-}
-
 // Contact extracted from job
 export interface ExtractedContact {
   companyId: string;

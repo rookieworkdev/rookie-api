@@ -78,7 +78,3 @@ export function parseRawIndeedJobs(data: unknown[]): z.infer<typeof RawIndeedJob
   return results;
 }
 
-export function parseJobEvaluationResult(data: unknown): z.infer<typeof JobEvaluationResultSchema> | null {
-  const parsed = JobEvaluationResultSchema.safeParse(data);
-  return parsed.success ? parsed.data : null;
-}
