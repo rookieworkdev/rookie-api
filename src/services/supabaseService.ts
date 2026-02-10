@@ -13,7 +13,11 @@ import type {
   JobAdRecord,
 } from '../types/index.js';
 
-const supabase = createClient(config.supabase.url, config.supabase.key || '');
+if (!config.supabase.key) {
+  throw new Error('SUPABASE_KEY is required');
+}
+
+const supabase = createClient(config.supabase.url, config.supabase.key);
 
 /**
  * Calls the find_or_create_company stored procedure
