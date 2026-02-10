@@ -311,6 +311,7 @@ Provide your analysis in this exact JSON format:
         { role: 'user', content: userPrompt },
       ],
       temperature: config.openai.temperature,
+      response_format: { type: 'json_object' },
     });
 
     const content = response.choices[0].message.content;
@@ -319,7 +320,7 @@ Provide your analysis in this exact JSON format:
       throw new Error('No content in OpenAI response');
     }
 
-    // Parse the response (remove markdown code blocks if present)
+    // Parse the response (remove markdown code blocks if present, as safety net)
     const cleanContent = content
       .replace(/^```json\s*/i, '')
       .replace(/\s*```\s*$/, '')
@@ -387,6 +388,7 @@ Return ONLY valid JSON in this format:
         { role: 'user', content: userPrompt },
       ],
       temperature: config.openai.temperature,
+      response_format: { type: 'json_object' },
     });
 
     const content = response.choices[0].message.content;
@@ -395,7 +397,7 @@ Return ONLY valid JSON in this format:
       throw new Error('No content in OpenAI response');
     }
 
-    // Parse the response
+    // Parse the response (remove markdown code blocks if present, as safety net)
     const cleanContent = content
       .replace(/^```json\s*/i, '')
       .replace(/\s*```\s*$/, '')
@@ -453,6 +455,7 @@ export async function evaluateJob(job: NormalizedJob): Promise<JobEvaluationResu
         { role: 'user', content: userPrompt },
       ],
       temperature: 0.3, // Lower temperature for more consistent evaluations
+      response_format: { type: 'json_object' },
     });
 
     const content = response.choices[0].message.content;
@@ -531,6 +534,7 @@ async function evaluateJobWithFallback(job: NormalizedJob): Promise<JobEvaluatio
       { role: 'user', content: userPrompt },
     ],
     temperature: 0.3,
+    response_format: { type: 'json_object' },
   });
 
   const content = response.choices[0].message.content;
