@@ -98,6 +98,8 @@ export interface ExtractedContact {
   email?: string;
   linkedinUrl?: string;
   source: string;
+  // 'api_extracted' = structured data from the source API (e.g. LinkedIn job poster profile)
+  // 'ai_extracted'  = parsed by AI from job description text (e.g. application email)
   sourceMethod: 'api_extracted' | 'ai_extracted';
   relatedJobAdId?: string;
 }
