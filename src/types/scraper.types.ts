@@ -102,6 +102,56 @@ export interface ExtractedContact {
   relatedJobAdId?: string;
 }
 
+// Raw job data from Apify LinkedIn scraper
+export interface RawLinkedInJob {
+  id: string;
+  title: string;
+  companyName: string;
+  location: string;
+  descriptionText: string;
+  link: string;
+  employmentType?: string;
+  salaryInfo?: string[];
+  postedAt?: string;
+  seniorityLevel?: string;
+  jobPosterName?: string;
+  jobPosterTitle?: string;
+  jobPosterProfileUrl?: string;
+  companyLinkedinUrl?: string;
+  companyWebsite?: string;
+  companyDescription?: string;
+  companyEmployeesCount?: number;
+  applyUrl?: string;
+}
+
+// LinkedIn search category configuration
+export interface LinkedInSearchCategory {
+  name: string;
+  keywords: string;
+  location: string;
+}
+
+// LinkedIn scraper config
+export interface LinkedInScraperConfig {
+  source: 'linkedin';
+  apifyActorId: string;
+  geoId: string;
+  defaultMaxItemsPerCategory: number;
+  categories: LinkedInSearchCategory[];
+  fieldMapping: {
+    externalId: string;
+    title: string;
+    company: string;
+    location: string;
+    description: string;
+    url: string;
+    postedAt: string;
+    applicationUrl: string;
+    jobType: string;
+    salary: string;
+  };
+}
+
 // Scraper config types
 export interface IndeedScraperConfig {
   source: 'indeed';

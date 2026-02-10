@@ -62,6 +62,31 @@ export const ScraperRunRequestSchema = z.object({
 
 export type ScraperRunRequestType = z.infer<typeof ScraperRunRequestSchema>;
 
+// Schema for raw LinkedIn job from Apify
+// Note: Using lenient validation because Apify can return various formats
+export const RawLinkedInJobSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  companyName: z.string(),
+  location: z.string().optional().nullable().default(''),
+  descriptionText: z.string().optional().nullable().default(''),
+  link: z.string().min(1),
+  employmentType: z.string().optional().nullable(),
+  salaryInfo: z.array(z.string()).optional().nullable(),
+  postedAt: z.string().optional().nullable(),
+  seniorityLevel: z.string().optional().nullable(),
+  jobPosterName: z.string().optional().nullable(),
+  jobPosterTitle: z.string().optional().nullable(),
+  jobPosterProfileUrl: z.string().optional().nullable(),
+  companyLinkedinUrl: z.string().optional().nullable(),
+  companyWebsite: z.string().optional().nullable(),
+  companyDescription: z.string().optional().nullable(),
+  companyEmployeesCount: z.number().optional().nullable(),
+  applyUrl: z.string().optional().nullable(),
+});
+
+export type RawLinkedInJobType = z.infer<typeof RawLinkedInJobSchema>;
+
 // Validation helpers
 export function parseRawIndeedJobs(data: unknown[]): z.infer<typeof RawIndeedJobSchema>[] {
   const results: z.infer<typeof RawIndeedJobSchema>[] = [];
@@ -74,6 +99,21 @@ export function parseRawIndeedJobs(data: unknown[]): z.infer<typeof RawIndeedJob
   }
 
   logger.debug('Parsed raw Indeed jobs', { parsed: results.length, total: data.length });
+
+  return results;
+}
+
+export function parseRawLinkedInJobs(data: unknown[]): z.infer<typeof RawLinkedInJobSchema>[] {
+  const results: z.infer<typeof RawLinkedInJobSchema>[] = [];
+
+  for (const item of data) {
+    const parsed = RawLinkedInJobSchema.safeParse(item);
+    if (parsed.success) {
+      results.push(parsed.data);
+    }
+  }
+
+  logger.debug('Parsed raw LinkedIn jobs', { parsed: results.length, total: data.length });
 
   return results;
 }
