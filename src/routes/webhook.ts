@@ -30,7 +30,7 @@ import type {
 const router: Router = express.Router();
 
 /**
- * Main webhook handler
+ * Main webhook handler - FORM SUBMISSION
  * Replicates the entire N8n flow
  */
 /**
