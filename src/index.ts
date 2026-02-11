@@ -6,6 +6,7 @@ import { config } from './config/env.js';
 import { logger } from './utils/logger.js';
 import webhookRouter from './routes/webhook.js';
 import jobScrapingRouter from './routes/jobScraping.js';
+import leadScrapingRouter from './routes/leadScraping.js';
 // Import for Express Request type augmentation (adds rawBody property)
 import './middleware/webhookAuth.js';
 
@@ -71,6 +72,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 // Mount routes
 app.use('/api', webhookRouter);
 app.use('/api/scraping/jobs', jobScrapingRouter);
+app.use('/api/scraping/leads', leadScrapingRouter);
 
 // Root endpoint
 app.get('/', (_req: Request, res: Response) => {
@@ -82,9 +84,17 @@ app.get('/', (_req: Request, res: Response) => {
       webhook: 'POST /api/webhook',
       health: 'GET /api/health',
       scraping: {
-        indeed: 'POST /api/scraping/jobs/indeed',
-        cleanup: 'POST /api/scraping/jobs/cleanup',
-        health: 'GET /api/scraping/jobs/health',
+        jobs: {
+          indeed: 'POST /api/scraping/jobs/indeed',
+          linkedin: 'POST /api/scraping/jobs/linkedin',
+          af: 'POST /api/scraping/jobs/af',
+          cleanup: 'POST /api/scraping/jobs/cleanup',
+          health: 'GET /api/scraping/jobs/health',
+        },
+        leads: {
+          googleMaps: 'POST /api/scraping/leads/google-maps',
+          health: 'GET /api/scraping/leads/health',
+        },
       },
     },
   });
