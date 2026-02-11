@@ -174,3 +174,75 @@ export function parseRawAFJobs(data: unknown[]): z.infer<typeof RawAFJobSchema>[
   return results;
 }
 
+// ─── Google Maps Lead Scraper Schemas ───
+
+// Schema for individual enrichment lead from Apify
+const GoogleMapsLeadSchema = z.object({
+  firstName: z.string().optional().nullable(),
+  lastName: z.string().optional().nullable(),
+  fullName: z.string().optional().nullable(),
+  jobTitle: z.string().optional().nullable(),
+  headline: z.string().optional().nullable(),
+  email: z.string().optional().nullable(),
+  linkedinProfile: z.string().optional().nullable(),
+  photoUrl: z.string().optional().nullable(),
+  departments: z.array(z.string()).optional().nullable(),
+  seniority: z.string().optional().nullable(),
+  mobileNumber: z.string().optional().nullable(),
+});
+
+// Schema for raw Google Maps place from Apify
+// Note: Using lenient validation because Apify can return various formats
+export const RawGoogleMapsPlaceSchema = z.object({
+  title: z.string().min(1),
+  website: z.string().optional().nullable(),
+  categoryName: z.string().optional().nullable(),
+  placeId: z.string().min(1),
+  address: z.string().optional().nullable(),
+  city: z.string().optional().nullable(),
+  countryCode: z.string().optional().nullable(),
+  reviewsCount: z.number().optional().nullable(),
+  phone: z.string().optional().nullable(),
+  phoneUnformatted: z.string().optional().nullable(),
+  totalScore: z.number().optional().nullable(),
+  leadsEnrichment: z.array(GoogleMapsLeadSchema).optional().nullable(),
+});
+
+export type RawGoogleMapsPlaceType = z.infer<typeof RawGoogleMapsPlaceSchema>;
+
+// Schema for AI company evaluation response
+export const CompanyEvaluationResultSchema = z.object({
+  isValid: z.boolean(),
+  score: z.number().min(0).max(100),
+  reasoning: z.string(),
+  industry_category: z.string(),
+  size_estimate: z.string(),
+});
+
+export type CompanyEvaluationResultType = z.infer<typeof CompanyEvaluationResultSchema>;
+
+// Schema for lead scraper run request
+export const LeadScraperRunRequestSchema = z.object({
+  searchQueries: z.array(z.string().min(1)).optional(),
+  maxItemsPerQuery: z.number().min(1).max(200).optional().default(50),
+  countryFilter: z.string().optional().default('SE'),
+});
+
+export type LeadScraperRunRequestType = z.infer<typeof LeadScraperRunRequestSchema>;
+
+// Validation helper for raw Google Maps places
+export function parseRawGoogleMapsPlaces(data: unknown[]): z.infer<typeof RawGoogleMapsPlaceSchema>[] {
+  const results: z.infer<typeof RawGoogleMapsPlaceSchema>[] = [];
+
+  for (const item of data) {
+    const parsed = RawGoogleMapsPlaceSchema.safeParse(item);
+    if (parsed.success) {
+      results.push(parsed.data);
+    }
+  }
+
+  logger.debug('Parsed raw Google Maps places', { parsed: results.length, total: data.length });
+
+  return results;
+}
+

@@ -227,3 +227,108 @@ export interface ScraperDigestData {
   errors: ScraperRunResult['errors'];
   duration: number;
 }
+
+// ─── Google Maps Lead Scraper Types ───
+
+// Individual enrichment lead from Apify's leadsEnrichment array
+export interface GoogleMapsLead {
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
+  jobTitle?: string;
+  headline?: string;
+  email?: string;
+  linkedinProfile?: string;
+  photoUrl?: string;
+  departments?: string[];
+  seniority?: string;
+  mobileNumber?: string;
+}
+
+// Raw place data from Apify Google Maps actor (compass/crawler-google-places)
+export interface RawGoogleMapsPlace {
+  title: string;
+  website?: string;
+  categoryName?: string;
+  placeId: string;
+  address?: string;
+  city?: string;
+  countryCode?: string;
+  reviewsCount?: number;
+  phone?: string;
+  phoneUnformatted?: string;
+  totalScore?: number;
+  leadsEnrichment?: GoogleMapsLead[];
+}
+
+// Normalized company after transformation (common format for lead processing)
+export interface NormalizedGoogleMapsCompany {
+  placeId: string;
+  name: string;
+  domain: string;
+  website: string;
+  category?: string;
+  address?: string;
+  city?: string;
+  countryCode?: string;
+  reviewsCount?: number;
+  phone?: string;
+  googleRating?: number;
+  leads: GoogleMapsLead[];
+  rawData: Record<string, unknown>;
+}
+
+// AI company evaluation response
+export interface CompanyEvaluationResult {
+  isValid: boolean;
+  score: number;
+  reasoning: string;
+  industryCategory: string;
+  sizeEstimate: string;
+}
+
+// Company processing result (after AI + DB operations)
+export interface ProcessedCompany {
+  company: NormalizedGoogleMapsCompany;
+  evaluation: CompanyEvaluationResult;
+  companyId: string;
+  signalId: string;
+  contactsCreated: number;
+  success: boolean;
+  error?: string;
+}
+
+// Lead scraper run result
+export interface LeadScraperRunResult {
+  source: LeadScraperSource;
+  runId: string;
+  startTime: Date;
+  endTime: Date;
+  duration: number;
+  stats: {
+    fetched: number;
+    afterFilter: number;
+    processed: number;
+    valid: number;
+    discarded: number;
+    contactsCreated: number;
+    errors: number;
+  };
+  validCompanies: ProcessedCompany[];
+  discardedCompanies: ProcessedCompany[];
+  errors: Array<{ company?: NormalizedGoogleMapsCompany; error: string }>;
+}
+
+// Google Maps scraper config
+export interface GoogleMapsScraperConfig {
+  source: 'google_maps';
+  apifyActorId: string;
+  defaultMaxItemsPerQuery: number;
+  countryFilter: string;
+  language: string;
+  scrapeBusinessLeads: boolean;
+  maximumLeadsEnrichmentRecords: number;
+  leadsEnrichmentDepartments: string[];
+  leadsSeniority: string[];
+  defaultSearchQueries: string[];
+}
