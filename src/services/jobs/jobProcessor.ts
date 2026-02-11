@@ -185,8 +185,49 @@ export async function processJob(job: NormalizedJob): Promise<ProcessedJob> {
         employeeCount: raw.companyEmployeesCount as number | undefined,
       });
     } else {
-      // Default (Indeed, etc.): extract email contact only
-      const contact = extractContactFromJob(job, evaluation, companyId, jobAdResult.id);
+      // Default (Indeed, AF, etc.): extract email contact only
+      let contact = extractContactFromJob(job, evaluation, companyId, jobAdResult.id);
+
+      // AF fallback: use API-provided application email if AI didn't find one
+      if (!contact && job.source === 'arbetsformedlingen') {
+        const raw = job.rawData as Record<string, unknown>;
+        const appDetails = raw.application_details as { email?: string } | undefined;
+        const apiEmail = appDetails?.email;
+
+        if (apiEmail && apiEmail.includes('@')) {
+          const localPart = apiEmail.split('@')[0];
+          const parts = localPart.split(/[._-]/);
+
+          let firstName: string | undefined;
+          let lastName: string | undefined;
+          let fullName = 'Application Contact';
+
+          if (parts.length >= 2) {
+            firstName = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+            lastName = parts[1].charAt(0).toUpperCase() + parts[1].slice(1);
+            fullName = `${firstName} ${lastName}`;
+          } else if (parts.length === 1 && parts[0].length > 0) {
+            firstName = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+            fullName = firstName;
+          }
+
+          contact = {
+            companyId,
+            firstName,
+            lastName,
+            fullName,
+            email: apiEmail.toLowerCase().trim(),
+            source: 'arbetsformedlingen_job_ad',
+            sourceMethod: 'api_extracted',
+            relatedJobAdId: jobAdResult.id,
+          };
+
+          logger.debug('Using AF API application email as fallback', {
+            email: apiEmail.replace(/(.{2}).*(@.*)/, '$1***$2'),
+          });
+        }
+      }
+
       if (contact) {
         await upsertScrapedContact(contact);
       }

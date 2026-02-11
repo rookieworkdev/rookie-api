@@ -29,7 +29,7 @@ async function main() {
 		// 1. Fetch jobs from JobTech API
 		console.log('--- Starting job fetch ---')
 		const { jobs, raw } = await runAFFetch({
-			maxItems: 100, // AF API default limit
+			maxItems: 100, // adjust as needed; paginates automatically if > 100
 		})
 
 		raw.forEach((job, i) => {

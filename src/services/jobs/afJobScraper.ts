@@ -11,44 +11,59 @@ import type { RawAFJob, NormalizedJob, ScraperRunConfig } from '../../types/scra
 
 /**
  * Fetch jobs from Arbetsformedlingen JobTech API (public, no auth required)
+ * Paginates automatically if maxItems > 100 (API limit per request)
  */
 export async function fetchAFJobs(runConfig?: ScraperRunConfig): Promise<RawAFJob[]> {
   const keywords = runConfig?.keywords || defaultAFKeywords;
-  const limit = runConfig?.maxItems || afConfig.defaultLimit;
-
-  const url = buildAFSearchUrl(keywords, limit);
+  const totalRequested = runConfig?.maxItems || afConfig.defaultLimit;
+  const pageSize = Math.min(totalRequested, 100); // API max per request
 
   logger.info('Starting AF scraper', {
-    limit,
+    totalRequested,
     keywordsLength: keywords.length,
   });
 
-  try {
-    const response = await fetch(url, {
-      headers: { Accept: 'application/json' },
-    });
+  const allJobs: RawAFJob[] = [];
+  let offset = 0;
 
-    if (!response.ok) {
-      throw new Error(`AF API returned ${response.status}: ${response.statusText}`);
+  try {
+    while (allJobs.length < totalRequested) {
+      const limit = Math.min(pageSize, totalRequested - allJobs.length);
+      const url = buildAFSearchUrl(keywords, limit, afConfig.defaultPublishedAfterDays, offset);
+
+      const response = await fetch(url, {
+        headers: { Accept: 'application/json' },
+      });
+
+      if (!response.ok) {
+        throw new Error(`AF API returned ${response.status}: ${response.statusText}`);
+      }
+
+      const data = (await response.json()) as { hits?: unknown[]; total?: { value?: number } };
+      const hits = data.hits ?? [];
+
+      logger.info('AF API page received', {
+        offset,
+        limit,
+        totalHits: data.total?.value ?? 0,
+        returnedHits: hits.length,
+      });
+
+      if (hits.length === 0) break;
+
+      const validJobs = parseRawAFJobs(hits);
+      allJobs.push(...(validJobs as RawAFJob[]));
+      offset += hits.length;
+
+      // Stop if API returned fewer than requested (last page)
+      if (hits.length < limit) break;
     }
 
-    const data = (await response.json()) as { hits?: unknown[]; total?: { value?: number } };
-    const hits = data.hits ?? [];
-
-    logger.info('AF API response received', {
-      totalHits: data.total?.value ?? hits.length,
-      returnedHits: hits.length,
+    logger.info('AF scraper completed', {
+      totalFetched: allJobs.length,
     });
 
-    // Parse and validate the raw jobs
-    const validJobs = parseRawAFJobs(hits);
-
-    logger.info('Parsed AF jobs', {
-      raw: hits.length,
-      valid: validJobs.length,
-    });
-
-    return validJobs as RawAFJob[];
+    return allJobs;
   } catch (error) {
     logger.error('AF scraper failed', error);
     throw new Error(`AF scraper failed: ${getErrorMessage(error)}`);
