@@ -9,12 +9,17 @@ import type {
   NormalizedCompanyData,
   JobAdData,
 } from '../types/index.js';
-import type { NormalizedJob, JobEvaluationResult } from '../types/scraper.types.js';
+import type { NormalizedJob, JobEvaluationResult, NormalizedGoogleMapsCompany, CompanyEvaluationResult } from '../types/scraper.types.js';
 import {
   JOB_EVALUATION_SYSTEM_PROMPT,
   generateJobEvaluationUserPrompt,
   JobEvaluationResponseSchema,
 } from '../prompts/jobEvaluation.prompt.js';
+import {
+  COMPANY_SCORING_SYSTEM_PROMPT,
+  generateCompanyScoringUserPrompt,
+  CompanyScoringResponseSchema,
+} from '../prompts/companyScoring.prompt.js';
 
 // Zod schemas for AI response validation
 const AIScoreResultSchema = z.object({
@@ -564,5 +569,139 @@ async function evaluateJobWithFallback(job: NormalizedJob): Promise<JobEvaluatio
     reasoning: validated.data.reasoning,
     applicationEmail: validated.data.applicationEmail,
     duration: validated.data.duration,
+  };
+}
+
+// ============================================================================
+// COMPANY EVALUATION (for Google Maps leads via OpenRouter)
+// ============================================================================
+
+// Company scoring uses Gemini Flash Lite as primary, GPT-4o-mini as fallback
+const COMPANY_SCORING_PRIMARY_MODEL = 'google/gemini-2.5-flash-lite';
+const COMPANY_SCORING_FALLBACK_MODEL = 'openai/gpt-4o-mini';
+
+/**
+ * Evaluates a Google Maps company using AI for Rookie fit
+ * Uses Gemini 2.5 Flash Lite via OpenRouter, with GPT-4o-mini fallback
+ */
+export async function evaluateCompany(company: NormalizedGoogleMapsCompany): Promise<CompanyEvaluationResult> {
+  const client = openRouterClient || openai;
+  const model = openRouterClient ? COMPANY_SCORING_PRIMARY_MODEL : config.openai.model;
+
+  try {
+    logger.info('Evaluating company with AI', { name: company.name, domain: company.domain });
+
+    const userPrompt = generateCompanyScoringUserPrompt(company);
+
+    const response = await client.chat.completions.create({
+      model,
+      messages: [
+        { role: 'system', content: COMPANY_SCORING_SYSTEM_PROMPT },
+        { role: 'user', content: userPrompt },
+      ],
+      temperature: 0.3,
+      response_format: { type: 'json_object' },
+    });
+
+    const content = response.choices[0].message.content;
+
+    if (!content) {
+      throw new Error('No content in AI response');
+    }
+
+    // Parse the response (remove markdown code blocks if present)
+    const cleanContent = content
+      .replace(/^```json\s*/i, '')
+      .replace(/\s*```\s*$/, '')
+      .trim();
+
+    const jsonParsed = JSON.parse(cleanContent);
+    const validated = CompanyScoringResponseSchema.safeParse(jsonParsed);
+
+    if (!validated.success) {
+      logger.error('Company evaluation response validation failed', {
+        errors: validated.error.errors,
+        rawContent: cleanContent.substring(0, 500),
+      });
+      throw new Error(`Invalid AI response structure: ${validated.error.message}`);
+    }
+
+    const result: CompanyEvaluationResult = {
+      isValid: validated.data.isValid,
+      score: validated.data.score,
+      reasoning: validated.data.reasoning,
+      industryCategory: validated.data.industry_category,
+      sizeEstimate: validated.data.size_estimate,
+    };
+
+    logger.info('Company evaluation complete', {
+      name: company.name,
+      isValid: result.isValid,
+      score: result.score,
+      industryCategory: result.industryCategory,
+    });
+
+    return result;
+  } catch (error) {
+    // Try fallback model if primary fails and we're using OpenRouter
+    if (openRouterClient && model === COMPANY_SCORING_PRIMARY_MODEL) {
+      logger.warn('Primary company scoring model failed, trying fallback', { error: getErrorMessage(error) });
+      try {
+        return await evaluateCompanyWithFallback(company);
+      } catch (fallbackError) {
+        logger.error('Fallback company scoring model also failed', fallbackError);
+        throw new Error(`Company evaluation failed: ${getErrorMessage(fallbackError)}`);
+      }
+    }
+
+    logger.error('Error evaluating company', error);
+    throw new Error(`Company evaluation failed: ${getErrorMessage(error)}`);
+  }
+}
+
+/**
+ * Evaluate company with fallback model (GPT-4o-mini via OpenRouter)
+ */
+async function evaluateCompanyWithFallback(company: NormalizedGoogleMapsCompany): Promise<CompanyEvaluationResult> {
+  if (!openRouterClient) {
+    throw new Error('OpenRouter not configured for fallback');
+  }
+
+  const userPrompt = generateCompanyScoringUserPrompt(company);
+
+  const response = await openRouterClient.chat.completions.create({
+    model: COMPANY_SCORING_FALLBACK_MODEL,
+    messages: [
+      { role: 'system', content: COMPANY_SCORING_SYSTEM_PROMPT },
+      { role: 'user', content: userPrompt },
+    ],
+    temperature: 0.3,
+    response_format: { type: 'json_object' },
+  });
+
+  const content = response.choices[0].message.content;
+
+  if (!content) {
+    throw new Error('No content in fallback AI response');
+  }
+
+  const cleanContent = content
+    .replace(/^```json\s*/i, '')
+    .replace(/\s*```\s*$/, '')
+    .trim();
+
+  const jsonParsed = JSON.parse(cleanContent);
+  const validated = CompanyScoringResponseSchema.safeParse(jsonParsed);
+
+  if (!validated.success) {
+    throw new Error(`Invalid fallback AI response: ${validated.error.message}`);
+  }
+
+  return {
+    isValid: validated.data.isValid,
+    score: validated.data.score,
+    reasoning: validated.data.reasoning,
+    industryCategory: validated.data.industry_category,
+    sizeEstimate: validated.data.size_estimate,
   };
 }
