@@ -253,6 +253,7 @@ import type {
   JobEvaluationResult,
   ExtractedContact,
   JobScraperSource,
+  GoogleMapsLead,
 } from '../types/scraper.types.js';
 
 /**
@@ -602,4 +603,113 @@ export async function deleteOldJobsBySource(
     logger.error('Error deleting old jobs', error);
     throw new Error(`Failed to delete old jobs: ${getErrorMessage(error)}`);
   }
+}
+
+// ============================================================================
+// GOOGLE MAPS LEAD SCRAPER OPERATIONS
+// ============================================================================
+
+/**
+ * Update company with AI scoring results from Google Maps evaluation.
+ * Always overwrites — each scrape run produces a fresh evaluation.
+ */
+export async function updateCompanyScore(
+  companyId: string,
+  score: number,
+  industry: string,
+  aiReasoning: string
+): Promise<void> {
+  try {
+    logger.info('Updating company score', { companyId, score, industry });
+
+    const { error } = await supabase
+      .from('companies')
+      .update({
+        current_score: score,
+        industry,
+        ai_reasoning: aiReasoning,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', companyId);
+
+    if (error) {
+      throw error;
+    }
+
+    logger.info('Company score updated', { companyId, score });
+  } catch (error) {
+    logger.error('Error updating company score', error);
+    throw new Error(`Failed to update company score: ${getErrorMessage(error)}`);
+  }
+}
+
+/**
+ * Create a signal for a Google Maps listing.
+ * signal_type: 'google_maps_listing', source: 'google_maps'
+ */
+export async function createGoogleMapsSignal(
+  companyId: string,
+  payload: Record<string, unknown>
+): Promise<{ id: string }> {
+  try {
+    logger.info('Creating Google Maps signal', { companyId });
+
+    const { data, error } = await supabase
+      .from('signals')
+      .insert({
+        company_id: companyId,
+        signal_type: 'google_maps_listing',
+        source: 'google_maps',
+        signal_date: new Date().toISOString(),
+        payload,
+      })
+      .select('id')
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    logger.info('Google Maps signal created', { signalId: data.id });
+
+    return data;
+  } catch (error) {
+    logger.error('Error creating Google Maps signal', error);
+    throw new Error(`Failed to create Google Maps signal: ${getErrorMessage(error)}`);
+  }
+}
+
+/**
+ * Upsert a contact from Google Maps leadsEnrichment data.
+ * Routes to upsertScrapedContact (if email) or upsertLinkedInContact (if linkedin only).
+ */
+export async function upsertGoogleMapsContact(
+  companyId: string,
+  lead: GoogleMapsLead
+): Promise<{ id: string } | null> {
+  const contact: ExtractedContact = {
+    companyId,
+    firstName: lead.firstName || undefined,
+    lastName: lead.lastName || undefined,
+    fullName: lead.fullName || undefined,
+    title: lead.jobTitle || lead.headline || undefined,
+    email: lead.email?.toLowerCase().trim() || undefined,
+    linkedinUrl: lead.linkedinProfile || undefined,
+    source: 'google_maps',
+    sourceMethod: 'api_extracted',
+  };
+
+  // Prefer email-based upsert (stronger dedup key), fall back to linkedin
+  if (contact.email) {
+    return upsertScrapedContact(contact);
+  }
+
+  if (contact.linkedinUrl) {
+    return upsertLinkedInContact(contact);
+  }
+
+  logger.debug('Skipping Google Maps contact with no email or LinkedIn', {
+    name: lead.fullName,
+  });
+  return null;
 }
