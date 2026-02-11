@@ -2,7 +2,7 @@ import { Resend } from 'resend';
 import { config } from '../config/env.js';
 import { logger, getErrorMessage, maskEmail } from '../utils/logger.js';
 import type { FormData, JobAdData, EmailResponse } from '../types/index.js';
-import type { ScraperRunResult, ProcessedJob } from '../types/scraper.types.js';
+import type { ScraperRunResult, ProcessedJob, LeadScraperRunResult, ProcessedCompany } from '../types/scraper.types.js';
 
 const resend = new Resend(config.resend.apiKey);
 
@@ -637,6 +637,268 @@ export async function sendJobScraperDigestEmail(result: ScraperRunResult): Promi
     return data as EmailResponse;
   } catch (err) {
     logger.error('Error sending scraper digest email', err);
+    return null;
+  }
+}
+
+// ============================================================================
+// LEAD SCRAPER DIGEST EMAIL (Google Maps)
+// ============================================================================
+
+/**
+ * Generate HTML for a company row in the lead digest table
+ */
+function generateCompanyRow(company: ProcessedCompany, index: number): string {
+  const bg = index % 2 === 0 ? '#fff' : '#fafafa';
+  const score = company.evaluation.score;
+  const scoreColor = score >= 85 ? '#c8e6c9' : score >= 60 ? '#fff9c4' : '#ffcdd2';
+
+  // Format decision makers from leads
+  let leadsHtml = '';
+  if (company.company.leads.length > 0) {
+    leadsHtml = company.company.leads
+      .slice(0, 3)
+      .map((lead) => {
+        const name =
+          lead.fullName ||
+          `${lead.firstName || ''} ${lead.lastName || ''}`.trim() ||
+          'Unknown';
+        const title = lead.jobTitle || lead.headline || '';
+        const linkedIn = lead.linkedinProfile || '';
+        return `<div style="margin-bottom: 4px;">
+          <strong>${escapeHtml(name)}</strong><br>
+          <span style="font-size: 11px; color: #666;">${escapeHtml(title)}</span>
+          ${linkedIn ? `<br><a href="${encodeURI(linkedIn)}" style="font-size: 10px; color: #1565c0;">LinkedIn</a>` : ''}
+        </div>`;
+      })
+      .join('');
+  } else {
+    leadsHtml = '<span style="color: #999; font-size: 11px;">No leads found</span>';
+  }
+
+  const domain = company.company.domain;
+  const website = company.company.website;
+
+  return `
+    <tr style="background: ${bg};">
+      <td style="padding: 8px; border-bottom: 1px solid #eee; vertical-align: top;">
+        <strong>${escapeHtml(company.company.name)}</strong><br>
+        <a href="${encodeURI(website)}" style="font-size: 11px; color: #1565c0;">${escapeHtml(domain)}</a>
+      </td>
+      <td style="padding: 8px; border-bottom: 1px solid #eee; vertical-align: top;">${escapeHtml(company.evaluation.industryCategory)}</td>
+      <td style="padding: 8px; border-bottom: 1px solid #eee; vertical-align: top;">${escapeHtml(company.company.city || '')}</td>
+      <td style="padding: 8px; border-bottom: 1px solid #eee; vertical-align: top;">
+        <span style="background: ${scoreColor}; padding: 2px 8px; border-radius: 3px; font-weight: bold;">${score}</span>
+      </td>
+      <td style="padding: 8px; border-bottom: 1px solid #eee; vertical-align: top; font-size: 12px;">${leadsHtml}</td>
+      <td style="padding: 8px; border-bottom: 1px solid #eee; font-size: 12px; color: #666; vertical-align: top;">
+        ${escapeHtml(company.evaluation.reasoning.substring(0, 150))}${company.evaluation.reasoning.length > 150 ? '...' : ''}
+      </td>
+    </tr>`;
+}
+
+/**
+ * Generate the lead scraper digest HTML email
+ */
+function generateLeadScraperDigestHTML(result: LeadScraperRunResult): string {
+  const date = formatDate(result.startTime);
+  const durationSec = (result.duration / 1000).toFixed(1);
+
+  // Count total leads across all valid companies
+  const totalLeads = result.validCompanies.reduce(
+    (sum, c) => sum + c.company.leads.length,
+    0
+  );
+
+  let validHtml = '';
+  if (result.validCompanies.length > 0) {
+    validHtml = `
+      <h3 style="color: #2e7d32; margin-bottom: 10px;">New Prospects (${result.validCompanies.length})</h3>
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
+        <thead>
+          <tr style="background: #f5f5f5; text-align: left;">
+            <th style="padding: 8px; border-bottom: 2px solid #ddd; width: 18%;">Company</th>
+            <th style="padding: 8px; border-bottom: 2px solid #ddd; width: 10%;">Industry</th>
+            <th style="padding: 8px; border-bottom: 2px solid #ddd; width: 10%;">Location</th>
+            <th style="padding: 8px; border-bottom: 2px solid #ddd; width: 6%;">Score</th>
+            <th style="padding: 8px; border-bottom: 2px solid #ddd; width: 28%;">Decision Makers</th>
+            <th style="padding: 8px; border-bottom: 2px solid #ddd; width: 28%;">Reasoning</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${result.validCompanies.map((c, i) => generateCompanyRow(c, i)).join('')}
+        </tbody>
+      </table>
+    `;
+  } else {
+    validHtml = '<p style="color: #666; padding: 20px; background: #f5f5f5;">No new valid prospects found in this run.</p>';
+  }
+
+  let discardedHtml = '';
+  if (result.discardedCompanies.length > 0) {
+    discardedHtml = `
+      <details style="margin-top: 20px;">
+        <summary style="cursor: pointer; color: #666; font-size: 14px;">Filtered Out (${result.discardedCompanies.length} companies)</summary>
+        <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+          <thead>
+            <tr style="background: #f5f5f5; text-align: left;">
+              <th style="padding: 6px; border-bottom: 1px solid #ddd; font-size: 12px;">Company</th>
+              <th style="padding: 6px; border-bottom: 1px solid #ddd; font-size: 12px;">Score</th>
+              <th style="padding: 6px; border-bottom: 1px solid #ddd; font-size: 12px;">Reason</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${result.discardedCompanies
+              .map(
+                (c) => `
+              <tr>
+                <td style="padding: 6px; border-bottom: 1px solid #eee; font-size: 12px;">${escapeHtml(c.company.name)}</td>
+                <td style="padding: 6px; border-bottom: 1px solid #eee; font-size: 12px;">${c.evaluation.score}</td>
+                <td style="padding: 6px; border-bottom: 1px solid #eee; font-size: 12px; color: #999;">${escapeHtml(c.evaluation.reasoning.substring(0, 100))}${c.evaluation.reasoning.length > 100 ? '...' : ''}</td>
+              </tr>`
+              )
+              .join('')}
+          </tbody>
+        </table>
+      </details>
+    `;
+  }
+
+  let errorsHtml = '';
+  if (result.errors.length > 0) {
+    errorsHtml = `
+      <h3 style="color: #d32f2f; margin-top: 24px;">Errors (${result.errors.length})</h3>
+      <ul style="background: #ffebee; padding: 16px 32px; border-radius: 4px;">
+        ${result.errors.slice(0, 10).map((e) => `<li>${escapeHtml(e.company?.name || 'Unknown')}: ${escapeHtml(e.error)}</li>`).join('')}
+        ${result.errors.length > 10 ? `<li>... and ${result.errors.length - 10} more</li>` : ''}
+      </ul>
+    `;
+  }
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      font-size: 13px;
+      color: #333;
+      line-height: 1.5;
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    .header {
+      border-bottom: 2px solid #333;
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+    }
+    .stats {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 24px;
+    }
+    .stat-box {
+      background: #f5f5f5;
+      padding: 12px 20px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .stat-number {
+      font-size: 24px;
+      font-weight: bold;
+      color: #1565c0;
+    }
+    .stat-label {
+      font-size: 11px;
+      color: #666;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2 style="margin: 0;">Google Maps Prospecting Digest</h2>
+      <p style="margin: 5px 0 0 0; color: #666;">${date} | Duration: ${durationSec}s</p>
+    </div>
+
+    <div class="stats">
+      <div class="stat-box">
+        <div class="stat-number">${result.stats.fetched}</div>
+        <div class="stat-label">Fetched</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-number">${result.stats.afterFilter}</div>
+        <div class="stat-label">After Filter</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-number" style="color: #2e7d32;">${result.stats.valid}</div>
+        <div class="stat-label">Valid Prospects</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-number" style="color: #1565c0;">${result.stats.contactsCreated}</div>
+        <div class="stat-label">Contacts</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-number" style="color: #c0392b;">${result.stats.discarded}</div>
+        <div class="stat-label">Discarded</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-number" style="color: #d32f2f;">${result.stats.errors}</div>
+        <div class="stat-label">Errors</div>
+      </div>
+    </div>
+
+    ${validHtml}
+    ${discardedHtml}
+    ${errorsHtml}
+
+    <div style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 10px; text-align: center; font-size: 11px; color: #999;">
+      Run ID: ${result.runId} | ${totalLeads} Decision Makers Found | Generated by Rookie Lead Scraper
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+/**
+ * Sends the lead scraper digest email via Resend
+ */
+export async function sendLeadScraperDigestEmail(result: LeadScraperRunResult): Promise<EmailResponse | null> {
+  try {
+    const recipient = config.adminAlert?.email || 'rookiework.dev@gmail.com';
+    const today = new Date().toLocaleDateString('sv-SE');
+
+    logger.info('Sending lead scraper digest email', {
+      source: result.source,
+      recipient,
+      validCompanies: result.stats.valid,
+      contactsCreated: result.stats.contactsCreated,
+    });
+
+    const { data, error } = await resend.emails.send({
+      from: config.resend.fromEmail,
+      to: recipient,
+      subject: `Google Maps Digest: ${result.stats.valid} New Prospects, ${result.stats.contactsCreated} Contacts | ${today}`,
+      html: generateLeadScraperDigestHTML(result),
+    });
+
+    if (error) {
+      logger.error('Failed to send lead scraper digest email', error);
+      return null;
+    }
+
+    logger.info('Lead scraper digest email sent', { emailId: data?.id });
+
+    return data as EmailResponse;
+  } catch (err) {
+    logger.error('Error sending lead scraper digest email', err);
     return null;
   }
 }
