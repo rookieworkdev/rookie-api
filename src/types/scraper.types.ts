@@ -174,6 +174,49 @@ export interface IndeedScraperConfig {
   };
 }
 
+// Raw job data from Arbetsformedlingen JobTech API
+export interface RawAFJob {
+  id: string;
+  external_id?: string;
+  headline: string;
+  employer: { name: string };
+  workplace_address?: {
+    municipality?: string;
+    region?: string;
+    country?: string;
+  };
+  description?: { text?: string; text_formatted?: string };
+  webpage_url: string;
+  application_details?: { url?: string; email?: string };
+  publication_date?: string;
+  application_deadline?: string;
+  employment_type?: { label?: string };
+  salary_type?: { label?: string };
+  duration?: { label?: string };
+  number_of_vacancies?: number;
+  removed?: boolean;
+}
+
+// Arbetsformedlingen scraper config
+export interface AFScraperConfig {
+  source: 'arbetsformedlingen';
+  apiBaseUrl: string;
+  defaultLimit: number;
+  defaultPublishedAfterDays: number;
+  fieldMapping: {
+    externalId: string;
+    title: string;
+    company: string;
+    location: string;
+    description: string;
+    url: string;
+    postedAt: string;
+    applicationUrl: string;
+    jobType: string;
+    salary: string;
+  };
+}
+
 // Email digest data
 export interface ScraperDigestData {
   source: JobScraperSource;

@@ -87,6 +87,47 @@ export const RawLinkedInJobSchema = z.object({
 
 export type RawLinkedInJobType = z.infer<typeof RawLinkedInJobSchema>;
 
+// Schema for raw Arbetsformedlingen job from JobTech API
+// Note: Using lenient validation because the public API may return partial data
+export const RawAFJobSchema = z.object({
+  id: z.string(),
+  external_id: z.string().optional().nullable(),
+  headline: z.string(),
+  employer: z.object({ name: z.string() }),
+  workplace_address: z
+    .object({
+      municipality: z.string().optional().nullable(),
+      region: z.string().optional().nullable(),
+      country: z.string().optional().nullable(),
+    })
+    .optional()
+    .nullable(),
+  description: z
+    .object({
+      text: z.string().optional().nullable(),
+      text_formatted: z.string().optional().nullable(),
+    })
+    .optional()
+    .nullable(),
+  webpage_url: z.string().min(1),
+  application_details: z
+    .object({
+      url: z.string().optional().nullable(),
+      email: z.string().optional().nullable(),
+    })
+    .optional()
+    .nullable(),
+  publication_date: z.string().optional().nullable(),
+  application_deadline: z.string().optional().nullable(),
+  employment_type: z.object({ label: z.string().optional().nullable() }).optional().nullable(),
+  salary_type: z.object({ label: z.string().optional().nullable() }).optional().nullable(),
+  duration: z.object({ label: z.string().optional().nullable() }).optional().nullable(),
+  number_of_vacancies: z.number().optional().nullable(),
+  removed: z.boolean().optional().nullable(),
+});
+
+export type RawAFJobType = z.infer<typeof RawAFJobSchema>;
+
 // Validation helpers
 export function parseRawIndeedJobs(data: unknown[]): z.infer<typeof RawIndeedJobSchema>[] {
   const results: z.infer<typeof RawIndeedJobSchema>[] = [];
@@ -114,6 +155,21 @@ export function parseRawLinkedInJobs(data: unknown[]): z.infer<typeof RawLinkedI
   }
 
   logger.debug('Parsed raw LinkedIn jobs', { parsed: results.length, total: data.length });
+
+  return results;
+}
+
+export function parseRawAFJobs(data: unknown[]): z.infer<typeof RawAFJobSchema>[] {
+  const results: z.infer<typeof RawAFJobSchema>[] = [];
+
+  for (const item of data) {
+    const parsed = RawAFJobSchema.safeParse(item);
+    if (parsed.success) {
+      results.push(parsed.data);
+    }
+  }
+
+  logger.debug('Parsed raw AF jobs', { parsed: results.length, total: data.length });
 
   return results;
 }
