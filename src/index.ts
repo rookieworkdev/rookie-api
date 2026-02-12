@@ -7,6 +7,7 @@ import { logger } from './utils/logger.js';
 import webhookRouter from './routes/webhook.js';
 import jobScrapingRouter from './routes/jobScraping.js';
 import leadScrapingRouter from './routes/leadScraping.js';
+import adminRouter from './routes/admin.js';
 // Import for Express Request type augmentation (adds rawBody property)
 import './middleware/webhookAuth.js';
 
@@ -73,6 +74,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 app.use('/api', webhookRouter);
 app.use('/api/scraping/jobs', jobScrapingRouter);
 app.use('/api/scraping/leads', leadScrapingRouter);
+app.use('/api/admin', adminRouter);
 
 // Root endpoint
 app.get('/', (_req: Request, res: Response) => {
@@ -95,6 +97,14 @@ app.get('/', (_req: Request, res: Response) => {
           googleMaps: 'POST /api/scraping/leads/google-maps',
           health: 'GET /api/scraping/leads/health',
         },
+      },
+      admin: {
+        health: 'GET /api/admin/health',
+        healthCheck: 'GET /api/admin/health-check',
+        signalsBySource: 'GET /api/admin/stats/signals-by-source',
+        topCompanies: 'GET /api/admin/stats/top-companies',
+        jobsBySource: 'GET /api/admin/stats/jobs-by-source',
+        sendDigest: 'POST /api/admin/health-check/send-digest',
       },
     },
   });

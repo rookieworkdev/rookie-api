@@ -3,6 +3,7 @@ import { config } from '../config/env.js';
 import { logger, getErrorMessage, maskEmail } from '../utils/logger.js';
 import type { FormData, JobAdData, EmailResponse } from '../types/index.js';
 import type { ScraperRunResult, ProcessedJob, LeadScraperRunResult, ProcessedCompany } from '../types/scraper.types.js';
+import type { HealthCheckResult, HealthCheckItem, HealthCheckSeverity } from '../types/healthCheck.types.js';
 
 const resend = new Resend(config.resend.apiKey);
 
@@ -899,6 +900,240 @@ export async function sendLeadScraperDigestEmail(result: LeadScraperRunResult): 
     return data as EmailResponse;
   } catch (err) {
     logger.error('Error sending lead scraper digest email', err);
+    return null;
+  }
+}
+
+// ============================================================================
+// HEALTH CHECK DIGEST EMAIL
+// ============================================================================
+
+function severityColor(severity: HealthCheckSeverity): string {
+  if (severity === 'critical') return '#dc2626';
+  if (severity === 'warning') return '#d97706';
+  return '#16a34a';
+}
+
+function severityBg(severity: HealthCheckSeverity): string {
+  if (severity === 'critical') return '#fef2f2';
+  if (severity === 'warning') return '#fffbeb';
+  return '#f0fdf4';
+}
+
+function severityLabel(severity: HealthCheckSeverity): string {
+  return severity.toUpperCase();
+}
+
+/**
+ * Generate the health check digest HTML email
+ */
+function generateHealthCheckDigestHTML(result: HealthCheckResult): string {
+  const date = formatDate(new Date(result.timestamp));
+  const durationSec = (result.duration / 1000).toFixed(1);
+
+  // Group checks by category
+  const categories = new Map<string, HealthCheckItem[]>();
+  for (const check of result.checks) {
+    const list = categories.get(check.category) || [];
+    list.push(check);
+    categories.set(check.category, list);
+  }
+
+  const categoryLabels: Record<string, string> = {
+    referential_integrity: 'Referential Integrity',
+    data_quality: 'Data Quality',
+    freshness: 'Freshness',
+    signal_stats: 'Signal Stats',
+    volume: 'Volume',
+  };
+
+  // Build category tables
+  let categorySectionsHtml = '';
+  for (const [category, checks] of categories) {
+    const rows = checks
+      .map(
+        (c) => `
+      <tr>
+        <td style="padding: 6px 10px; border-bottom: 1px solid #eee;">
+          <span style="display: inline-block; background: ${severityBg(c.severity)}; color: ${severityColor(c.severity)}; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: bold;">${severityLabel(c.severity)}</span>
+        </td>
+        <td style="padding: 6px 10px; border-bottom: 1px solid #eee; font-weight: 500;">${escapeHtml(c.name)}</td>
+        <td style="padding: 6px 10px; border-bottom: 1px solid #eee; text-align: right; font-family: monospace;">${c.count}</td>
+        <td style="padding: 6px 10px; border-bottom: 1px solid #eee; color: #666; font-size: 12px;">${escapeHtml(c.message)}</td>
+      </tr>`
+      )
+      .join('');
+
+    categorySectionsHtml += `
+      <h3 style="margin: 24px 0 8px 0; color: #374151; font-size: 15px;">${escapeHtml(categoryLabels[category] || category)}</h3>
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 12px;">
+        <thead>
+          <tr style="background: #f5f5f5;">
+            <th style="padding: 6px 10px; text-align: left; font-size: 11px; width: 80px;">Status</th>
+            <th style="padding: 6px 10px; text-align: left; font-size: 11px;">Check</th>
+            <th style="padding: 6px 10px; text-align: right; font-size: 11px; width: 60px;">Count</th>
+            <th style="padding: 6px 10px; text-align: left; font-size: 11px;">Message</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
+
+  // Signals by source summary
+  let signalsSummaryHtml = '';
+  if (result.signalsBySource.length > 0) {
+    const signalRows = result.signalsBySource
+      .map(
+        (s) => `
+      <tr>
+        <td style="padding: 6px 10px; border-bottom: 1px solid #eee; font-weight: 500;">${escapeHtml(s.source)}</td>
+        <td style="padding: 6px 10px; border-bottom: 1px solid #eee; text-align: right; font-family: monospace;">${s.total}</td>
+        <td style="padding: 6px 10px; border-bottom: 1px solid #eee; text-align: right; font-family: monospace;">${s.last_7_days}</td>
+        <td style="padding: 6px 10px; border-bottom: 1px solid #eee; text-align: right; font-family: monospace;">${s.last_30_days}</td>
+        <td style="padding: 6px 10px; border-bottom: 1px solid #eee; font-size: 12px; color: #666;">${s.last_captured ? new Date(s.last_captured).toLocaleDateString('sv-SE') : 'N/A'}</td>
+      </tr>`
+      )
+      .join('');
+
+    signalsSummaryHtml = `
+      <h3 style="margin: 24px 0 8px 0; color: #374151; font-size: 15px;">Signals by Source</h3>
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 12px;">
+        <thead>
+          <tr style="background: #f5f5f5;">
+            <th style="padding: 6px 10px; text-align: left; font-size: 11px;">Source</th>
+            <th style="padding: 6px 10px; text-align: right; font-size: 11px;">Total</th>
+            <th style="padding: 6px 10px; text-align: right; font-size: 11px;">7 Days</th>
+            <th style="padding: 6px 10px; text-align: right; font-size: 11px;">30 Days</th>
+            <th style="padding: 6px 10px; text-align: left; font-size: 11px;">Last Captured</th>
+          </tr>
+        </thead>
+        <tbody>${signalRows}</tbody>
+      </table>`;
+  }
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      font-size: 13px;
+      color: #333;
+      line-height: 1.5;
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    .header {
+      border-bottom: 2px solid #333;
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+    }
+    .stats {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 24px;
+    }
+    .stat-box {
+      background: #f5f5f5;
+      padding: 12px 20px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .stat-number {
+      font-size: 24px;
+      font-weight: bold;
+      color: #1565c0;
+    }
+    .stat-label {
+      font-size: 11px;
+      color: #666;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2 style="margin: 0;">
+        DB Health Check
+        <span style="display: inline-block; background: ${severityBg(result.overallSeverity)}; color: ${severityColor(result.overallSeverity)}; padding: 4px 12px; border-radius: 4px; font-size: 14px; margin-left: 8px;">${severityLabel(result.overallSeverity)}</span>
+      </h2>
+      <p style="margin: 5px 0 0 0; color: #666;">${date} | Duration: ${durationSec}s</p>
+    </div>
+
+    <div class="stats">
+      <div class="stat-box">
+        <div class="stat-number">${result.summary.total}</div>
+        <div class="stat-label">Total Checks</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-number" style="color: #16a34a;">${result.summary.ok}</div>
+        <div class="stat-label">OK</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-number" style="color: #d97706;">${result.summary.warning}</div>
+        <div class="stat-label">Warnings</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-number" style="color: #dc2626;">${result.summary.critical}</div>
+        <div class="stat-label">Critical</div>
+      </div>
+    </div>
+
+    ${categorySectionsHtml}
+    ${signalsSummaryHtml}
+
+    <div style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 10px; text-align: center; font-size: 11px; color: #999;">
+      Generated at ${escapeHtml(result.timestamp)} | Rookie DB Health Check
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+/**
+ * Sends the health check digest email via Resend
+ */
+export async function sendHealthCheckDigestEmail(result: HealthCheckResult): Promise<EmailResponse | null> {
+  try {
+    const recipient = config.adminAlert?.email || 'rookiework.dev@gmail.com';
+    const today = new Date().toLocaleDateString('sv-SE');
+
+    const issueCount = result.summary.warning + result.summary.critical;
+    const subject =
+      issueCount === 0
+        ? `DB Health: All Clear | ${result.summary.total}/${result.summary.total} OK | ${today}`
+        : `DB Health: ${issueCount} Issue${issueCount > 1 ? 's' : ''} | ${result.summary.ok}/${result.summary.total} OK | ${today}`;
+
+    logger.info('Sending health check digest email', {
+      recipient,
+      overallSeverity: result.overallSeverity,
+      summary: result.summary,
+    });
+
+    const { data, error } = await resend.emails.send({
+      from: config.resend.fromEmail,
+      to: recipient,
+      subject,
+      html: generateHealthCheckDigestHTML(result),
+    });
+
+    if (error) {
+      logger.error('Failed to send health check digest email', error);
+      return null;
+    }
+
+    logger.info('Health check digest email sent', { emailId: data?.id });
+
+    return data as EmailResponse;
+  } catch (err) {
+    logger.error('Error sending health check digest email', err);
     return null;
   }
 }
