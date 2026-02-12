@@ -1,20 +1,21 @@
-// /dev/tests/runAFTest.ts
+// ⚠️ DO NOT MOVE this file — it relies on relative import paths to src/services/ and src/utils/.
 /**
- * Manual test script to run the Arbetsformedlingen scraper locally.
+ * Manual integration test: Arbetsformedlingen (AF) job scraper
  *
- * Usage:
- * 1. Start your dev server if needed (optional, not required for this script):
- *    pnpm run dev
- * 2. Run this script from the project root:
- *    pnpm exec tsx src/dev/tests/runAFTest.ts
+ * Runs the full AF scraper pipeline end-to-end:
+ * 1. Fetches jobs from the free JobTech API (no auth/credits needed, paginates automatically)
+ * 2. Processes them through the AI/LLM evaluation pipeline
+ * 3. Writes results to Supabase (job_ads, signals, contacts, companies)
+ * 4. Sends the digest email via Resend
  *
- * This will:
- * - Fetch jobs from the JobTech API via runAFFetch() (public, no auth required)
- * - Process them through the AI/LLM pipeline via runJobProcessingPipeline()
- * - Write results to your database (job_ads, signals, contacts)
- * - Send the digest email
+ * Requires: .env with OPENAI_API_KEY, SUPABASE_URL, SUPABASE_KEY, RESEND_API_KEY
+ * (No Apify token needed — AF uses the public JobTech API)
  *
- * NOTE: This script is for local testing only. Do NOT deploy it to production.
+ * Run from project root:
+ *   pnpm test:af
+ *   (or: pnpm exec tsx src/dev/scraper-tests/runAFTest.ts)
+ *
+ * NOTE: For local testing only. Do NOT deploy to production.
  */
 
 import { runAFFetch } from '../../services/jobs/afJobScraper.js'

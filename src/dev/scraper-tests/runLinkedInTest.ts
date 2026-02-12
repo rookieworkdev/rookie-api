@@ -1,20 +1,20 @@
-// /dev/tests/runLinkedInTest.ts
+// ⚠️ DO NOT MOVE this file — it relies on relative import paths to src/services/ and src/utils/.
 /**
- * Manual test script to run the LinkedIn scraper locally.
+ * Manual integration test: LinkedIn job scraper
  *
- * Usage:
- * 1. Start your dev server if needed (optional, not required for this script):
- *    pnpm run dev
- * 2. Run this script from the project root:
- *    pnpm exec tsx src/dev/tests/runLinkedInTest.ts
+ * Runs the full LinkedIn scraper pipeline end-to-end:
+ * 1. Fetches jobs from Apify across all 5 categories, deduplicated (costs Apify credits)
+ * 2. Processes them through the AI/LLM evaluation pipeline
+ * 3. Writes results to Supabase (job_ads, signals, contacts, companies)
+ * 4. Sends the digest email via Resend
  *
- * This will:
- * - Fetch jobs from Apify via runLinkedInFetch() (all 5 categories, deduplicated)
- * - Process them through the AI/LLM pipeline via runJobProcessingPipeline()
- * - Write results to your database (job_ads, signals, contacts, company enrichment)
- * - Send the digest email
+ * Requires: .env with APIFY_TOKEN, OPENAI_API_KEY, SUPABASE_URL, SUPABASE_KEY, RESEND_API_KEY
  *
- * NOTE: This script is for local testing only. Do NOT deploy it to production.
+ * Run from project root:
+ *   pnpm test:linkedin
+ *   (or: pnpm exec tsx src/dev/scraper-tests/runLinkedInTest.ts)
+ *
+ * NOTE: For local testing only. Do NOT deploy to production.
  */
 
 import { runLinkedInFetch } from '../../services/jobs/linkedinJobScraper.js'

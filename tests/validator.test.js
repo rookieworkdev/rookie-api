@@ -1,3 +1,13 @@
+/**
+ * Unit tests: Lead validation and domain extraction
+ *
+ * Tests the validateLead() utility (scoring completeness, spam detection)
+ * and extractDomain() (corporate email parsing, personal email filtering,
+ * Swedish company name suffix stripping like AB/Aktiebolag).
+ *
+ * Run from project root:
+ *   pnpm test
+ */
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { validateLead, extractDomain } from '../dist/utils/validator.js';

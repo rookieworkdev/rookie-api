@@ -1,3 +1,13 @@
+/**
+ * Unit tests: AI response schema validation
+ *
+ * Tests that the Zod schemas for AI scoring responses (lead classification)
+ * and AI-generated job ads correctly accept valid data and reject invalid data.
+ * Also tests markdown code block stripping from AI responses.
+ *
+ * Run from project root:
+ *   pnpm test
+ */
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { z } from 'zod';

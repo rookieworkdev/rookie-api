@@ -1,3 +1,13 @@
+/**
+ * Unit tests: Webhook request parsing and validation
+ *
+ * Tests the Zod-based webhook request parser — verifies it correctly accepts
+ * valid form submissions and rejects missing/invalid fields (name, email, company).
+ * Also tests the validation error formatter.
+ *
+ * Run from project root:
+ *   pnpm test
+ */
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { parseWebhookRequest, formatValidationErrors } from '../dist/schemas/webhook.js';

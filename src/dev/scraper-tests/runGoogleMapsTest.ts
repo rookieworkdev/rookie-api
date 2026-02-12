@@ -1,21 +1,21 @@
-// /dev/tests/runGoogleMapsTest.ts
+// ⚠️ DO NOT MOVE this file — it relies on relative import paths to src/services/ and src/utils/.
 /**
- * Manual test script to run the Google Maps lead scraper locally.
+ * Manual integration test: Google Maps lead scraper
  *
- * Usage:
- * 1. Start your dev server if needed (optional, not required for this script):
- *    pnpm run dev
- * 2. Run this script from the project root:
- *    pnpm exec tsx src/dev/tests/runGoogleMapsTest.ts
+ * Runs the full Google Maps lead pipeline end-to-end:
+ * 1. Fetches companies from Google Maps via Apify (costs Apify credits)
+ * 2. Filters for Swedish companies with websites
+ * 3. Scores each company with AI (Gemini Flash Lite via OpenRouter)
+ * 4. Creates company/signal/contact records in Supabase
+ * 5. Sends the lead digest email via Resend
  *
- * This will:
- * - Fetch companies from Google Maps via Apify (costs Apify credits)
- * - Filter for Swedish companies with websites
- * - Score each company with AI (Gemini Flash Lite via OpenRouter)
- * - Create company/signal/contact records in the database
- * - Send the digest email
+ * Requires: .env with APIFY_TOKEN, OPENAI_API_KEY, SUPABASE_URL, SUPABASE_KEY, RESEND_API_KEY
  *
- * NOTE: This script is for local testing only. Do NOT deploy it to production.
+ * Run from project root:
+ *   pnpm test:googlemaps
+ *   (or: pnpm exec tsx src/dev/scraper-tests/runGoogleMapsTest.ts)
+ *
+ * NOTE: For local testing only. Do NOT deploy to production.
  */
 
 import { runGoogleMapsFetch } from '../../services/leads/googleMapsScraper.js'
