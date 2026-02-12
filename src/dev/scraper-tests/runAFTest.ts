@@ -5,7 +5,7 @@
  * Runs the full AF scraper pipeline end-to-end:
  * 1. Fetches jobs from the free JobTech API (no auth/credits needed, paginates automatically)
  * 2. Processes them through the AI/LLM evaluation pipeline
- * 3. Writes results to Supabase (job_ads, signals, contacts, companies)
+ * 3. Writes results to Supabase (jobs, signals, contacts, companies)
  * 4. Sends the digest email via Resend
  *
  * Requires: .env with OPENAI_API_KEY, SUPABASE_URL, SUPABASE_KEY, RESEND_API_KEY

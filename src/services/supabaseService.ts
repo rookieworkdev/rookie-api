@@ -194,7 +194,7 @@ export async function upsertContact(contactData: ContactData): Promise<ContactRe
 }
 
 /**
- * Creates a job ad record in job_ads
+ * Creates a job ad record in jobs table
  * Replicates "Create Job Ad Record" node
  */
 export async function createJobAdRecord(
@@ -208,7 +208,7 @@ export async function createJobAdRecord(
     const now = Date.now().toString();
 
     const { data, error } = await supabase
-      .from('job_ads')
+      .from('jobs')
       .insert({
         company_id: jobAdData.company_id,
         title: jobAdData.title,
@@ -266,7 +266,7 @@ export async function findExistingJobsBySource(
     logger.info('Fetching existing jobs for deduplication', { source });
 
     const { data, error } = await supabase
-      .from('job_ads')
+      .from('jobs')
       .select('external_id, external_url')
       .eq('source', source);
 
@@ -302,7 +302,7 @@ export async function createJobAdFromScraper(
     logger.info('Creating job ad from scraper', { title: job.title, source: job.source });
 
     const { data, error } = await supabase
-      .from('job_ads')
+      .from('jobs')
       .insert({
         company_id: companyId,
         title: job.title,
@@ -639,7 +639,7 @@ export async function deleteOldJobsBySource(
     logger.info('Deleting old jobs', { source, olderThanDays, cutoffDate: cutoffDate.toISOString() });
 
     const { data, error } = await supabase
-      .from('job_ads')
+      .from('jobs')
       .delete()
       .eq('source', source)
       .lt('posted_date', cutoffDate.toISOString().split('T')[0])
