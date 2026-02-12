@@ -403,43 +403,68 @@ export async function upsertScrapedContact(contact: ExtractedContact): Promise<{
       return null;
     }
 
-    logger.info('Upserting scraped contact', { email: maskEmail(contact.email) });
+    // Split comma-separated emails into separate contact records
+    const emails = contact.email
+      .split(',')
+      .map((e) => e.toLowerCase().trim())
+      .filter((e) => e.length > 0 && e.includes('@'));
 
-    const { data, error } = await supabase
-      .from('contacts')
-      .upsert(
-        {
-          company_id: contact.companyId,
-          first_name: contact.firstName,
-          last_name: contact.lastName,
-          full_name: contact.fullName,
-          title: contact.title,
-          email: contact.email.toLowerCase().trim(),
-          linkedin_url: contact.linkedinUrl,
-          source: contact.source,
-          source_method: contact.sourceMethod,
-          related_job_ad_id: contact.relatedJobAdId,
-        },
-        {
-          onConflict: 'company_id,email',
-          ignoreDuplicates: false,
-        }
-      )
-      .select('id')
-      .single();
-
-    if (error) {
-      // Ignore unique constraint violations (duplicate contacts)
-      if (error.code === '23505') {
-        logger.debug('Contact already exists, skipping', { email: maskEmail(contact.email) });
-        return null;
-      }
-      throw error;
+    if (emails.length === 0) {
+      return null;
     }
 
-    logger.info('Scraped contact upserted', { contactId: data.id });
+    if (emails.length > 1) {
+      logger.info('Splitting multi-email contact into separate records', {
+        count: emails.length,
+        companyId: contact.companyId,
+      });
+    }
 
-    return data;
+    let firstResult: { id: string } | null = null;
+
+    for (const email of emails) {
+      logger.info('Upserting scraped contact', { email: maskEmail(email) });
+
+      const { data, error } = await supabase
+        .from('contacts')
+        .upsert(
+          {
+            company_id: contact.companyId,
+            first_name: contact.firstName,
+            last_name: contact.lastName,
+            full_name: contact.fullName,
+            title: contact.title,
+            email,
+            linkedin_url: contact.linkedinUrl,
+            source: contact.source,
+            source_method: contact.sourceMethod,
+            related_job_ad_id: contact.relatedJobAdId,
+          },
+          {
+            onConflict: 'company_id,email',
+            ignoreDuplicates: false,
+          }
+        )
+        .select('id')
+        .single();
+
+      if (error) {
+        // Ignore unique constraint violations (duplicate contacts)
+        if (error.code === '23505') {
+          logger.debug('Contact already exists, skipping', { email: maskEmail(email) });
+          continue;
+        }
+        throw error;
+      }
+
+      logger.info('Scraped contact upserted', { contactId: data.id });
+
+      if (!firstResult) {
+        firstResult = data;
+      }
+    }
+
+    return firstResult;
   } catch (error) {
     logger.error('Error upserting scraped contact', error);
     // Don't throw - contact upsert failures shouldn't break the pipeline
