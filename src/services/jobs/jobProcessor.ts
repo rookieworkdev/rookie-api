@@ -141,8 +141,25 @@ function extractLinkedInContacts(
  */
 export async function processJob(job: NormalizedJob): Promise<ProcessedJob> {
   try {
-    // 1. Evaluate with AI
-    const evaluation = await evaluateJob(job);
+    // 1. Evaluate with AI (with fallback on failure)
+    let evaluation: JobEvaluationResult;
+    try {
+      evaluation = await evaluateJob(job);
+    } catch (aiError) {
+      logger.error('AI evaluation failed, saving job with fallback evaluation', aiError, {
+        title: job.title, company: job.company,
+      });
+      evaluation = {
+        isValid: false,
+        score: 0,
+        category: 'AI Evaluation Failed',
+        experience: '',
+        experienceLogic: 'AI evaluation failed — saved for manual review',
+        reasoning: `AI evaluation error: ${getErrorMessage(aiError)}`,
+        applicationEmail: 'Email Not Found',
+        duration: '',
+      };
+    }
 
     // 2. Find or create company
     const guessedDomain = guessCompanyDomain(job.company);

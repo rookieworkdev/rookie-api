@@ -6,7 +6,7 @@ import { runLinkedInFetch } from '../services/jobs/linkedinJobScraper.js';
 import { runAFFetch } from '../services/jobs/afJobScraper.js';
 import { runJobProcessingPipeline } from '../services/jobs/jobProcessor.js';
 import { deleteOldJobsBySource } from '../services/supabaseService.js';
-import { sendJobScraperDigestEmail } from '../services/emailService.js';
+import { sendJobScraperDigestEmail, sendScraperFailureAlert } from '../services/emailService.js';
 import { ScraperRunRequestSchema, type ScraperRunRequestType } from '../schemas/scraper.js';
 import { verifyScraperApiKey } from '../middleware/scraperAuth.js';
 
@@ -90,6 +90,8 @@ router.post('/indeed', async (req: Request, res: Response) => {
     const processingTime = Date.now() - startTime;
     logger.error('Indeed scraper run failed', error, { processingTime });
 
+    sendScraperFailureAlert('indeed', error, { processingTime }).catch(() => {});
+
     return res.status(500).json({
       success: false,
       error: getErrorMessage(error),
@@ -161,6 +163,8 @@ router.post('/linkedin', async (req: Request, res: Response) => {
     const processingTime = Date.now() - startTime;
     logger.error('LinkedIn scraper run failed', error, { processingTime });
 
+    sendScraperFailureAlert('linkedin', error, { processingTime }).catch(() => {});
+
     return res.status(500).json({
       success: false,
       error: getErrorMessage(error),
@@ -230,6 +234,8 @@ router.post('/af', async (req: Request, res: Response) => {
   } catch (error) {
     const processingTime = Date.now() - startTime;
     logger.error('AF scraper run failed', error, { processingTime });
+
+    sendScraperFailureAlert('arbetsformedlingen', error, { processingTime }).catch(() => {});
 
     return res.status(500).json({
       success: false,

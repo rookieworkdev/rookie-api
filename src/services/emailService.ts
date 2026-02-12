@@ -406,6 +406,131 @@ export async function sendAdminAlert(
 }
 
 // ============================================================================
+// SCRAPER FAILURE ALERT EMAIL
+// ============================================================================
+
+/**
+ * Generates HTML for a scraper failure alert
+ */
+function generateScraperFailureAlertHTML(
+  source: string,
+  error: unknown,
+  context?: { runId?: string; step?: string; processingTime?: number }
+): string {
+  const errorMessage = getErrorMessage(error);
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #111827;
+      background: #f9fafb;
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: #ffffff;
+      border-radius: 8px;
+      padding: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .alert-header {
+      background: #fee2e2;
+      color: #991b1b;
+      padding: 16px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+    }
+    .alert-header h1 {
+      margin: 0;
+      font-size: 20px;
+    }
+    .error-box {
+      background: #fef2f2;
+      border-left: 4px solid #dc2626;
+      padding: 12px;
+      margin: 12px 0;
+      border-radius: 4px;
+    }
+    .data-item {
+      background: #f9fafb;
+      padding: 8px 12px;
+      margin: 4px 0;
+      border-radius: 4px;
+    }
+    .data-item strong {
+      color: #4b5563;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="alert-header">
+      <h1>Scraper Failed: ${escapeHtml(source)}</h1>
+    </div>
+
+    <div class="error-box">
+      <p><strong>Error:</strong> ${escapeHtml(errorMessage)}</p>
+      <p><strong>Timestamp:</strong> ${new Date().toLocaleString('sv-SE')}</p>
+      ${context?.step ? `<p><strong>Step:</strong> ${escapeHtml(context.step)}</p>` : ''}
+    </div>
+
+    <div class="data-item"><strong>Source:</strong> ${escapeHtml(source)}</div>
+    ${context?.runId ? `<div class="data-item"><strong>Run ID:</strong> ${escapeHtml(context.runId)}</div>` : ''}
+    ${context?.processingTime != null ? `<div class="data-item"><strong>Processing time:</strong> ${(context.processingTime / 1000).toFixed(1)}s</div>` : ''}
+
+    <p style="margin-top: 20px; font-size: 12px; color: #6b7280;">
+      <strong>Action required:</strong> Check logs and investigate the failure. The scraper did not complete — data from this run may be lost.
+    </p>
+  </div>
+</body>
+</html>`;
+}
+
+/**
+ * Sends an alert email when a scraper route fails.
+ * Fire-and-forget — never throws.
+ */
+export async function sendScraperFailureAlert(
+  source: string,
+  error: unknown,
+  context?: { runId?: string; step?: string; processingTime?: number }
+): Promise<EmailResponse | null> {
+  try {
+    if (!config.adminAlert?.email) {
+      logger.warn('Admin alert email not configured, skipping scraper failure alert');
+      return null;
+    }
+
+    logger.info('Sending scraper failure alert', { source, email: config.adminAlert.email });
+
+    const { data, error: emailError } = await resend.emails.send({
+      from: config.resend.fromEmail,
+      to: config.adminAlert.email,
+      subject: `Scraper Failed: ${source} | ${new Date().toLocaleDateString('sv-SE')}`,
+      html: generateScraperFailureAlertHTML(source, error, context),
+    });
+
+    if (emailError) {
+      logger.error('Failed to send scraper failure alert email', emailError);
+      return null;
+    }
+
+    logger.info('Scraper failure alert sent', { emailId: data?.id });
+
+    return data as EmailResponse;
+  } catch (err) {
+    logger.error('Error sending scraper failure alert email', err);
+    return null;
+  }
+}
+
+// ============================================================================
 // SCRAPER DIGEST EMAIL
 // ============================================================================
 

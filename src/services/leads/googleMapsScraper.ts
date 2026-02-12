@@ -19,6 +19,7 @@ import {
 } from '../supabaseService.js';
 import type {
   NormalizedGoogleMapsCompany,
+  CompanyEvaluationResult,
   ProcessedCompany,
   LeadScraperRunResult,
 } from '../../types/scraper.types.js';
@@ -210,8 +211,22 @@ export async function processCompany(
   company: NormalizedGoogleMapsCompany
 ): Promise<ProcessedCompany> {
   try {
-    // 1. AI evaluate company
-    const evaluation = await evaluateCompany(company);
+    // 1. AI evaluate company (with fallback on failure)
+    let evaluation: CompanyEvaluationResult;
+    try {
+      evaluation = await evaluateCompany(company);
+    } catch (aiError) {
+      logger.error('AI company evaluation failed, saving with fallback', aiError, {
+        name: company.name, domain: company.domain,
+      });
+      evaluation = {
+        isValid: false,
+        score: 0,
+        reasoning: `AI evaluation error: ${getErrorMessage(aiError)}`,
+        industryCategory: 'AI Evaluation Failed',
+        sizeEstimate: 'Unknown',
+      };
+    }
 
     // 2. Find or create company in DB
     const companyId = await findOrCreateCompany(

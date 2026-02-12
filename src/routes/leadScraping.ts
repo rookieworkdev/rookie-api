@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { config } from '../config/env.js';
 import { logger, getErrorMessage } from '../utils/logger.js';
 import { runGoogleMapsFetch } from '../services/leads/googleMapsScraper.js';
-import { sendLeadScraperDigestEmail } from '../services/emailService.js';
+import { sendLeadScraperDigestEmail, sendScraperFailureAlert } from '../services/emailService.js';
 import { LeadScraperRunRequestSchema, type LeadScraperRunRequestType } from '../schemas/scraper.js';
 import { verifyScraperApiKey } from '../middleware/scraperAuth.js';
 
@@ -81,6 +81,8 @@ router.post('/google-maps', async (req: Request, res: Response) => {
   } catch (error) {
     const processingTime = Date.now() - startTime;
     logger.error('Google Maps lead scraper run failed', error, { processingTime });
+
+    sendScraperFailureAlert('google_maps', error, { processingTime }).catch(() => {});
 
     return res.status(500).json({
       success: false,

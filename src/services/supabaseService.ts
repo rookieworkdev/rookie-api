@@ -454,6 +454,24 @@ export async function upsertScrapedContact(contact: ExtractedContact): Promise<{
     for (const email of emails) {
       logger.info('Upserting scraped contact', { email: maskEmail(email) });
 
+      // Protect api_extracted from being downgraded to ai_extracted
+      if (contact.sourceMethod === 'ai_extracted') {
+        const { data: existing } = await supabase
+          .from('contacts')
+          .select('source_method')
+          .eq('company_id', contact.companyId)
+          .eq('email', email)
+          .maybeSingle();
+
+        if (existing?.source_method === 'api_extracted') {
+          logger.info('Preserving api_extracted, skipping ai_extracted overwrite', {
+            email: maskEmail(email),
+            companyId: contact.companyId,
+          });
+          continue;
+        }
+      }
+
       const { data, error } = await supabase
         .from('contacts')
         .upsert(
