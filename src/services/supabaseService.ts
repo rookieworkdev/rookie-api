@@ -393,6 +393,26 @@ export async function createSignalForJobAd(
   }
 }
 
+// Generic email prefixes that should not be used as contact names.
+// When the AI or fallback code derives a name from e.g. "info@company.se",
+// we get "Info" as full_name — these have zero outreach value.
+const GENERIC_EMAIL_PREFIXES = new Set([
+  'info', 'hr', 'hello', 'hej', 'jobb', 'jobs', 'job', 'kansli', 'work',
+  'kontakt', 'contact', 'reception', 'office', 'admin', 'support', 'career',
+  'careers', 'rekrytering', 'recruiting', 'recruitment', 'personal',
+  'ekonomi', 'faktura', 'invoice', 'order', 'sales', 'mail', 'post',
+  'service', 'kundtjanst', 'kundservice', 'application', 'apply',
+]);
+
+/**
+ * Check if a contact name is a generic email prefix (not a real person's name).
+ * Returns true if the name should be cleared.
+ */
+function isGenericContactName(name: string | undefined): boolean {
+  if (!name) return false;
+  return GENERIC_EMAIL_PREFIXES.has(name.toLowerCase().trim());
+}
+
 /**
  * Upsert a contact extracted from a scraped job
  */
@@ -420,6 +440,15 @@ export async function upsertScrapedContact(contact: ExtractedContact): Promise<{
       });
     }
 
+    // Clear name fields if they match a generic email prefix (e.g. "Info", "Hr")
+    let { firstName, lastName, fullName } = contact;
+    if (isGenericContactName(fullName)) {
+      logger.info('Clearing generic contact name', { fullName, companyId: contact.companyId });
+      firstName = undefined;
+      lastName = undefined;
+      fullName = undefined;
+    }
+
     let firstResult: { id: string } | null = null;
 
     for (const email of emails) {
@@ -430,9 +459,9 @@ export async function upsertScrapedContact(contact: ExtractedContact): Promise<{
         .upsert(
           {
             company_id: contact.companyId,
-            first_name: contact.firstName,
-            last_name: contact.lastName,
-            full_name: contact.fullName,
+            first_name: firstName ?? null,
+            last_name: lastName ?? null,
+            full_name: fullName ?? null,
             title: contact.title,
             email,
             linkedin_url: contact.linkedinUrl,
