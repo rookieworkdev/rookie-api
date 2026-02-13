@@ -204,10 +204,12 @@ export interface EmailResponse {
 // Webhook response types
 export interface WebhookSuccessResponse {
   success: true;
+  dryRun?: boolean;
   message: string;
   classification?: string;
   lead_score?: number;
   job_ad_title?: string;
+  job_ad_description?: string;
   reason?: string;
   processingTime: number;
 }

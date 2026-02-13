@@ -43,6 +43,7 @@ const router: Router = express.Router();
  *       **Auth:** Uses HMAC-SHA256 signature verification via `x-webhook-signature` header (not the API key).
  *
  *       **Tip:** Add `?dryRun=true` to get a mock response instantly without processing anything (skips signature check too).
+ *       Use `?dryRun=true&mockClassification=invalid_lead` to see different response shapes.
  *     parameters:
  *       - in: query
  *         name: dryRun
@@ -50,6 +51,13 @@ const router: Router = express.Router();
  *           type: boolean
  *           default: false
  *         description: If true, returns mock data without processing (for Swagger testing, skips signature verification)
+ *       - in: query
+ *         name: mockClassification
+ *         schema:
+ *           type: string
+ *           enum: [valid_lead, invalid_lead, likely_candidate, likely_spam]
+ *           default: valid_lead
+ *         description: Which classification to mock (only used when dryRun=true)
  *       - in: header
  *         name: x-webhook-signature
  *         required: true
@@ -82,8 +90,13 @@ const router: Router = express.Router();
  *               type: object
  *               properties:
  *                 success: { type: boolean }
+ *                 dryRun: { type: boolean, description: 'Present and true when using dryRun mode' }
  *                 message: { type: string }
  *                 classification: { type: string, enum: [valid_lead, invalid_lead, likely_candidate, likely_spam] }
+ *                 lead_score: { type: number, description: 'AI lead score 1-100 (valid_lead only)' }
+ *                 job_ad_title: { type: string, description: 'AI-generated job ad title (valid_lead only)' }
+ *                 job_ad_description: { type: string, description: 'AI-generated job ad description (valid_lead only)' }
+ *                 reason: { type: string, description: 'AI reasoning for rejection (invalid_lead/likely_spam only)' }
  *                 processingTime: { type: number }
  *       400:
  *         description: Invalid request data (missing required fields)
@@ -111,16 +124,48 @@ router.post('/webhook', verifyWebhookSignature, async (req: Request, res: Respon
   const startTime = Date.now();
 
   // Dry run: return mock data instantly (for Swagger testing)
+  // Use ?dryRun=true for valid_lead (default), or ?dryRun=true&mockClassification=invalid_lead etc.
   if (req.query.dryRun === 'true') {
-    return res.status(200).json({
-      success: true,
-      dryRun: true,
-      message: 'Valid lead processed successfully',
-      classification: 'valid_lead',
-      lead_score: 82,
-      job_ad_title: 'Ekonomiassistent till Tech Company AB',
-      processingTime: 0,
-    });
+    const mockClassification = (req.query.mockClassification as string) || 'valid_lead';
+
+    const mockResponses: Record<string, WebhookSuccessResponse> = {
+      valid_lead: {
+        success: true,
+        dryRun: true,
+        message: 'Valid lead processed successfully',
+        classification: 'valid_lead',
+        lead_score: 82,
+        job_ad_title: 'Ekonomiassistent till Tech Company AB',
+        job_ad_description: 'Vi söker en driven och noggrann ekonomiassistent till Tech Company AB. I denna roll kommer du att arbeta med löpande bokföring, fakturering och ekonomisk rapportering. Du har en relevant utbildning inom ekonomi och 0–3 års erfarenhet. Vi erbjuder en dynamisk arbetsmiljö med möjlighet till utveckling.',
+        processingTime: 0,
+      },
+      invalid_lead: {
+        success: true,
+        dryRun: true,
+        message: 'Lead classified as invalid',
+        classification: 'invalid_lead',
+        reason: 'Healthcare sector role (sjuksköterska) — outside Rookie target categories. Only admin/ekonomi roles in healthcare are valid.',
+        processingTime: 0,
+      },
+      likely_candidate: {
+        success: true,
+        dryRun: true,
+        message: 'Lead classified as job seeker',
+        classification: 'likely_candidate',
+        processingTime: 0,
+      },
+      likely_spam: {
+        success: true,
+        dryRun: true,
+        message: 'Lead classified as spam',
+        classification: 'likely_spam',
+        reason: 'Generic message with no company context, personal email domain, no specific recruitment need described.',
+        processingTime: 0,
+      },
+    };
+
+    const response = mockResponses[mockClassification] || mockResponses['valid_lead'];
+    return res.status(200).json(response);
   }
 
   // Declare formData outside try block so it's accessible in catch
@@ -246,6 +291,7 @@ router.post('/webhook', verifyWebhookSignature, async (req: Request, res: Respon
           classification: 'valid_lead',
           lead_score: normalizedData.lead_score,
           job_ad_title: jobAd.title,
+          job_ad_description: jobAd.description,
           processingTime: Date.now() - startTime,
         };
 
