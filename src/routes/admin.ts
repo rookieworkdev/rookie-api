@@ -13,6 +13,9 @@ import {
   getJobById,
   getCompanies,
   getCompanyById,
+  getContacts,
+  getSignals,
+  getDashboardSummary,
 } from '../services/supabaseService.js';
 
 const router: Router = Router();
@@ -279,6 +282,94 @@ router.get('/companies/:id', async (req: Request, res: Response) => {
     });
   } catch (error) {
     logger.error('Failed to fetch company', error);
+
+    return res.status(500).json({
+      success: false,
+      error: getErrorMessage(error),
+    });
+  }
+});
+
+/**
+ * GET /api/admin/contacts
+ * List contacts with company name
+ * Query params: source, source_method, limit, offset
+ */
+router.get('/contacts', async (req: Request, res: Response) => {
+  try {
+    const { source, source_method, limit, offset } = req.query;
+
+    const result = await getContacts({
+      source: source as string | undefined,
+      source_method: source_method as string | undefined,
+      limit: limit ? parseInt(limit as string, 10) : undefined,
+      offset: offset ? parseInt(offset as string, 10) : undefined,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: result.data,
+      total: result.count,
+      limit: limit ? parseInt(limit as string, 10) : 50,
+      offset: offset ? parseInt(offset as string, 10) : 0,
+    });
+  } catch (error) {
+    logger.error('Failed to fetch contacts', error);
+
+    return res.status(500).json({
+      success: false,
+      error: getErrorMessage(error),
+    });
+  }
+});
+
+/**
+ * GET /api/admin/signals
+ * List signals with company name
+ * Query params: source, signal_type, limit, offset
+ */
+router.get('/signals', async (req: Request, res: Response) => {
+  try {
+    const { source, signal_type, limit, offset } = req.query;
+
+    const result = await getSignals({
+      source: source as string | undefined,
+      signal_type: signal_type as string | undefined,
+      limit: limit ? parseInt(limit as string, 10) : undefined,
+      offset: offset ? parseInt(offset as string, 10) : undefined,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: result.data,
+      total: result.count,
+      limit: limit ? parseInt(limit as string, 10) : 50,
+      offset: offset ? parseInt(offset as string, 10) : 0,
+    });
+  } catch (error) {
+    logger.error('Failed to fetch signals', error);
+
+    return res.status(500).json({
+      success: false,
+      error: getErrorMessage(error),
+    });
+  }
+});
+
+/**
+ * GET /api/admin/dashboard
+ * Dashboard summary with key numbers
+ */
+router.get('/dashboard', async (_req: Request, res: Response) => {
+  try {
+    const summary = await getDashboardSummary();
+
+    return res.status(200).json({
+      success: true,
+      data: summary,
+    });
+  } catch (error) {
+    logger.error('Failed to fetch dashboard summary', error);
 
     return res.status(500).json({
       success: false,

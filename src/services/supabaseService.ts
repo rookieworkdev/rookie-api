@@ -929,3 +929,119 @@ export async function getCompanyById(
     throw new Error(`Failed to fetch company: ${getErrorMessage(error)}`);
   }
 }
+
+/**
+ * Fetch contacts with company name. Filterable by source and source_method.
+ */
+export async function getContacts(filters: {
+  source?: string;
+  source_method?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{ data: Record<string, unknown>[]; count: number }> {
+  try {
+    const limit = filters.limit ?? 50;
+    const offset = filters.offset ?? 0;
+
+    let query = supabase
+      .from('contacts')
+      .select(
+        'id, full_name, first_name, last_name, email, phone, title, linkedin_url, source, source_method, department, seniority, created_at, company_id, companies(id, name, domain)',
+        { count: 'exact' }
+      )
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (filters.source) {
+      query = query.eq('source', filters.source);
+    }
+    if (filters.source_method) {
+      query = query.eq('source_method', filters.source_method);
+    }
+
+    const { data, error, count } = await query;
+
+    if (error) throw error;
+
+    return { data: (data || []) as Record<string, unknown>[], count: count ?? 0 };
+  } catch (error) {
+    logger.error('Error fetching contacts', error);
+    throw new Error(`Failed to fetch contacts: ${getErrorMessage(error)}`);
+  }
+}
+
+/**
+ * Fetch signals with company name. Filterable by source and signal_type.
+ */
+export async function getSignals(filters: {
+  source?: string;
+  signal_type?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{ data: Record<string, unknown>[]; count: number }> {
+  try {
+    const limit = filters.limit ?? 50;
+    const offset = filters.offset ?? 0;
+
+    let query = supabase
+      .from('signals')
+      .select(
+        'id, signal_type, source, signal_date, captured_at, expired_at, score_contribution, payload, company_id, companies(id, name, domain)',
+        { count: 'exact' }
+      )
+      .order('captured_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (filters.source) {
+      query = query.eq('source', filters.source);
+    }
+    if (filters.signal_type) {
+      query = query.eq('signal_type', filters.signal_type);
+    }
+
+    const { data, error, count } = await query;
+
+    if (error) throw error;
+
+    return { data: (data || []) as Record<string, unknown>[], count: count ?? 0 };
+  } catch (error) {
+    logger.error('Error fetching signals', error);
+    throw new Error(`Failed to fetch signals: ${getErrorMessage(error)}`);
+  }
+}
+
+/**
+ * Dashboard summary: key numbers for an overview card.
+ */
+export async function getDashboardSummary(): Promise<Record<string, unknown>> {
+  try {
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    const weekCutoff = oneWeekAgo.toISOString();
+
+    // Run all counts in parallel
+    const [companies, jobs, contacts, signals, companiesWeek, jobsWeek, signalsWeek] =
+      await Promise.all([
+        supabase.from('companies').select('id', { count: 'exact', head: true }),
+        supabase.from('jobs').select('id', { count: 'exact', head: true }),
+        supabase.from('contacts').select('id', { count: 'exact', head: true }),
+        supabase.from('signals').select('id', { count: 'exact', head: true }),
+        supabase.from('companies').select('id', { count: 'exact', head: true }).gte('created_at', weekCutoff),
+        supabase.from('jobs').select('id', { count: 'exact', head: true }).gte('created_at', weekCutoff),
+        supabase.from('signals').select('id', { count: 'exact', head: true }).gte('captured_at', weekCutoff),
+      ]);
+
+    return {
+      total_companies: companies.count ?? 0,
+      total_jobs: jobs.count ?? 0,
+      total_contacts: contacts.count ?? 0,
+      total_signals: signals.count ?? 0,
+      companies_this_week: companiesWeek.count ?? 0,
+      jobs_this_week: jobsWeek.count ?? 0,
+      signals_this_week: signalsWeek.count ?? 0,
+    };
+  } catch (error) {
+    logger.error('Error fetching dashboard summary', error);
+    throw new Error(`Failed to fetch dashboard summary: ${getErrorMessage(error)}`);
+  }
+}
