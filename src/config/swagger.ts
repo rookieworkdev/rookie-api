@@ -28,7 +28,7 @@ x-api-key: <your-api-key>
 Add the API key to your environment:
 
 \`\`\`env
-ROOKIE_API_URL=http://localhost:3000
+ROOKIE_API_URL=http://localhost:8000
 ROOKIE_API_KEY=<your-api-key>
 \`\`\`
 
@@ -88,6 +88,19 @@ All errors follow the same shape:
 | Website Form | Webhook | AI-classified form submissions |
 
 New scrapers are picked up automatically — stats queries use \`GROUP BY source\`, so no config changes needed.
+
+---
+
+## Base URL
+
+**Local development:** \`http://localhost:8000\` (default port). Run with \`pnpm dev\` to start the server.
+
+**Production:** Once deployed, the base URL will be the hosting platform URL, for example:
+- Render: \`https://rookie-api.onrender.com\`
+- Railway: \`https://rookie-api-production.up.railway.app\`
+- Custom subdomain: \`https://api.rookie.se\`
+
+The endpoint paths (\`/api/admin/jobs\`, \`/api/docs\`, etc.) stay the same — only the base URL changes. Update the \`ROOKIE_API_URL\` environment variable in your frontend when switching between local and production.
       `,
       contact: {
         name: 'Rookie AB',
@@ -95,8 +108,12 @@ New scrapers are picked up automatically — stats queries use \`GROUP BY source
     },
     servers: [
       {
-        url: 'http://localhost:3000',
+        url: 'http://localhost:8000',
         description: 'Local development',
+      },
+      {
+        url: 'https://rookie-api.onrender.com',
+        description: 'Production (Render) — update URL after deployment',
       },
     ],
     components: {
