@@ -39,8 +39,17 @@ router.use(verifyScraperApiKey);
  *     description: |
  *       Triggers a Google Maps lead scraper run via Apify. Finds companies on Google Maps,
  *       runs AI evaluation on each, creates company + signal + contacts. Sends digest email.
+ *
+ *       **Tip:** Add `?dryRun=true` to get a mock response instantly without running the actual scraper.
  *     security:
  *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: dryRun
+ *         schema:
+ *           type: boolean
+ *           default: false
+ *         description: If true, returns mock data without running the scraper (for Swagger testing)
  *     requestBody:
  *       content:
  *         application/json:
@@ -81,6 +90,18 @@ router.use(verifyScraperApiKey);
  */
 router.post('/google-maps', async (req: Request, res: Response) => {
   const startTime = Date.now();
+
+  // Dry run: return mock data instantly (for Swagger testing)
+  if (req.query.dryRun === 'true') {
+    return res.status(200).json({
+      success: true,
+      dryRun: true,
+      runId: '00000000-0000-0000-0000-000000000000',
+      processingTime: 0,
+      stats: { fetched: 30, afterFilter: 22, processed: 22, valid: 18, discarded: 4, contactsCreated: 15, errors: 0 },
+      summary: { companiesEvaluated: 22, validProspects: 18, contactsCreated: 15, discarded: 4, errors: 0 },
+    });
+  }
 
   try {
     if (!config.scraper.enabled) {

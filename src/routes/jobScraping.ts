@@ -43,8 +43,17 @@ router.use(verifyScraperApiKey);
  *     description: |
  *       Triggers an Indeed scraper run via Apify. Fetches jobs, deduplicates against existing DB records,
  *       runs AI evaluation on each job, stores results, and sends a digest email. Typically triggered by cron.
+ *
+ *       **Tip:** Add `?dryRun=true` to get a mock response instantly without running the actual scraper.
  *     security:
  *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: dryRun
+ *         schema:
+ *           type: boolean
+ *           default: false
+ *         description: If true, returns mock data without running the scraper (for Swagger testing)
  *     requestBody:
  *       content:
  *         application/json:
@@ -64,6 +73,18 @@ router.use(verifyScraperApiKey);
  */
 router.post('/indeed', async (req: Request, res: Response) => {
   const startTime = Date.now();
+
+  // Dry run: return mock data instantly (for Swagger testing)
+  if (req.query.dryRun === 'true') {
+    return res.status(200).json({
+      success: true,
+      dryRun: true,
+      runId: '00000000-0000-0000-0000-000000000000',
+      processingTime: 0,
+      stats: { fetched: 25, afterDedup: 18, afterFilter: 15, processed: 15, valid: 12, discarded: 3, errors: 0 },
+      summary: { newJobsFound: 18, validJobs: 12, discardedJobs: 3, errors: 0 },
+    });
+  }
 
   try {
     if (!config.scraper.enabled) {
@@ -137,9 +158,19 @@ router.post('/indeed', async (req: Request, res: Response) => {
  *   post:
  *     tags: [Scrapers]
  *     summary: Run LinkedIn job scraper
- *     description: Triggers a LinkedIn scraper run via Apify. Same pipeline as Indeed. Default maxItems is 10.
+ *     description: |
+ *       Triggers a LinkedIn scraper run via Apify. Same pipeline as Indeed. Default maxItems is 10.
+ *
+ *       **Tip:** Add `?dryRun=true` to get a mock response instantly without running the actual scraper.
  *     security:
  *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: dryRun
+ *         schema:
+ *           type: boolean
+ *           default: false
+ *         description: If true, returns mock data without running the scraper (for Swagger testing)
  *     requestBody:
  *       content:
  *         application/json:
@@ -159,6 +190,18 @@ router.post('/indeed', async (req: Request, res: Response) => {
  */
 router.post('/linkedin', async (req: Request, res: Response) => {
   const startTime = Date.now();
+
+  // Dry run: return mock data instantly (for Swagger testing)
+  if (req.query.dryRun === 'true') {
+    return res.status(200).json({
+      success: true,
+      dryRun: true,
+      runId: '00000000-0000-0000-0000-000000000000',
+      processingTime: 0,
+      stats: { fetched: 10, afterDedup: 8, afterFilter: 7, processed: 7, valid: 5, discarded: 2, errors: 0 },
+      summary: { newJobsFound: 8, validJobs: 5, discardedJobs: 2, errors: 0 },
+    });
+  }
 
   try {
     if (!config.scraper.enabled) {
@@ -235,8 +278,17 @@ router.post('/linkedin', async (req: Request, res: Response) => {
  *     description: |
  *       Triggers an Arbetsförmedlingen scraper run via the free JobTech API (no Apify needed).
  *       Includes API email fallback and pagination. Default maxItems is 100.
+ *
+ *       **Tip:** Add `?dryRun=true` to get a mock response instantly without running the actual scraper.
  *     security:
  *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: dryRun
+ *         schema:
+ *           type: boolean
+ *           default: false
+ *         description: If true, returns mock data without running the scraper (for Swagger testing)
  *     requestBody:
  *       content:
  *         application/json:
@@ -256,6 +308,18 @@ router.post('/linkedin', async (req: Request, res: Response) => {
  */
 router.post('/af', async (req: Request, res: Response) => {
   const startTime = Date.now();
+
+  // Dry run: return mock data instantly (for Swagger testing)
+  if (req.query.dryRun === 'true') {
+    return res.status(200).json({
+      success: true,
+      dryRun: true,
+      runId: '00000000-0000-0000-0000-000000000000',
+      processingTime: 0,
+      stats: { fetched: 50, afterDedup: 40, afterFilter: 35, processed: 35, valid: 28, discarded: 7, errors: 0 },
+      summary: { newJobsFound: 40, validJobs: 28, discardedJobs: 7, errors: 0 },
+    });
+  }
 
   try {
     if (!config.scraper.enabled) {
@@ -328,9 +392,19 @@ router.post('/af', async (req: Request, res: Response) => {
  *   post:
  *     tags: [Scrapers]
  *     summary: Clean up old jobs
- *     description: Deletes jobs older than the retention period (default 20 days) for each scraper source.
+ *     description: |
+ *       Deletes jobs older than the retention period (default 20 days) for each scraper source.
+ *
+ *       **Tip:** Add `?dryRun=true` to get a mock response instantly without deleting anything.
  *     security:
  *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: dryRun
+ *         schema:
+ *           type: boolean
+ *           default: false
+ *         description: If true, returns mock data without deleting anything (for Swagger testing)
  *     responses:
  *       200:
  *         description: Cleanup completed
@@ -349,7 +423,18 @@ router.post('/af', async (req: Request, res: Response) => {
  *       401:
  *         description: Missing or invalid API key
  */
-router.post('/cleanup', async (_req: Request, res: Response) => {
+router.post('/cleanup', async (req: Request, res: Response) => {
+  // Dry run: return mock data instantly (for Swagger testing)
+  if (req.query.dryRun === 'true') {
+    return res.status(200).json({
+      success: true,
+      dryRun: true,
+      retentionDays: config.scraper.retentionDays,
+      deletedBySource: { indeed: 10, linkedin: 5, arbetsformedlingen: 8 },
+      totalDeleted: 23,
+    });
+  }
+
   try {
     const sources = ['indeed', 'linkedin', 'arbetsformedlingen'] as const;
     const retentionDays = config.scraper.retentionDays;
