@@ -30,8 +30,53 @@ import type {
 const router: Router = express.Router();
 
 /**
- * Main webhook handler - FORM SUBMISSION
- * Replicates the entire N8n flow
+ * @swagger
+ * /api/webhook:
+ *   post:
+ *     tags: [Webhook]
+ *     summary: Process form submission
+ *     description: |
+ *       Receives a form submission from the Rookie website, runs it through AI classification,
+ *       and routes it accordingly: valid leads get a company + signal + contact + AI job ad + email,
+ *       candidates and spam get stored for tracking. Always returns 200 to the caller.
+ *
+ *       **Auth:** Uses HMAC-SHA256 signature verification via `x-webhook-signature` header (not the API key).
+ *     parameters:
+ *       - in: header
+ *         name: x-webhook-signature
+ *         required: true
+ *         schema: { type: string }
+ *         description: HMAC-SHA256 hex digest of the request body
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name, email, company]
+ *             properties:
+ *               name: { type: string, example: 'Anna Svensson' }
+ *               email: { type: string, format: email, example: 'anna@techcompany.se' }
+ *               phone: { type: string }
+ *               company: { type: string, example: 'Tech Company AB' }
+ *               industry: { type: string }
+ *               service_type: { type: string }
+ *               message: { type: string }
+ *               subject: { type: string }
+ *     responses:
+ *       200:
+ *         description: Submission received and processed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 message: { type: string }
+ *                 classification: { type: string, enum: [valid_lead, invalid_lead, likely_candidate, likely_spam] }
+ *                 processingTime: { type: number }
+ *       400:
+ *         description: Invalid request data (missing required fields)
  */
 /**
  * Masks PII fields for GDPR-compliant logging while preserving structure visibility
@@ -272,7 +317,22 @@ router.post('/webhook', verifyWebhookSignature, async (req: Request, res: Respon
 });
 
 /**
- * Health check endpoint
+ * @swagger
+ * /api/health:
+ *   get:
+ *     tags: [Health]
+ *     summary: Main API health check
+ *     description: Simple health ping for the main API service. No authentication required.
+ *     responses:
+ *       200:
+ *         description: Service is healthy
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: healthy }
+ *                 timestamp: { type: string, format: date-time }
  */
 router.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({

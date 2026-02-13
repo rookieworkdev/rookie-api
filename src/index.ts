@@ -2,8 +2,10 @@ import express, { Request, Response, NextFunction, Application } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
+import swaggerUi from 'swagger-ui-express';
 import { config } from './config/env.js';
 import { logger } from './utils/logger.js';
+import { swaggerSpec } from './config/swagger.js';
 import webhookRouter from './routes/webhook.js';
 import jobScrapingRouter from './routes/jobScraping.js';
 import leadScrapingRouter from './routes/leadScraping.js';
@@ -76,6 +78,25 @@ app.use('/api/scraping/jobs', jobScrapingRouter);
 app.use('/api/scraping/leads', leadScrapingRouter);
 app.use('/api/admin', adminRouter);
 
+// Swagger UI - interactive API docs
+// Accessible at /api/docs (pass API key as query param ?api_key=... or use the Authorize button)
+app.use(
+  '/api/docs',
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerSpec, {
+    customSiteTitle: 'Rookie API Docs',
+    swaggerOptions: {
+      persistAuthorization: true,
+    },
+  })
+);
+
+// Serve raw OpenAPI spec as JSON (useful for code generators, Postman import, etc.)
+app.get('/api/docs.json', (_req: Request, res: Response) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerSpec);
+});
+
 // Root endpoint
 app.get('/', (_req: Request, res: Response) => {
   res.json({
@@ -105,6 +126,17 @@ app.get('/', (_req: Request, res: Response) => {
         topCompanies: 'GET /api/admin/stats/top-companies',
         jobsBySource: 'GET /api/admin/stats/jobs-by-source',
         sendDigest: 'POST /api/admin/health-check/send-digest',
+        dashboard: 'GET /api/admin/dashboard',
+        jobs: 'GET /api/admin/jobs',
+        jobDetail: 'GET /api/admin/jobs/:id',
+        companies: 'GET /api/admin/companies',
+        companyDetail: 'GET /api/admin/companies/:id',
+        contacts: 'GET /api/admin/contacts',
+        signals: 'GET /api/admin/signals',
+      },
+      docs: {
+        swagger: 'GET /api/docs',
+        openApiSpec: 'GET /api/docs.json',
       },
     },
   });

@@ -13,8 +13,15 @@ import { verifyScraperApiKey } from '../middleware/scraperAuth.js';
 const router: Router = Router();
 
 /**
- * GET /api/scraping/jobs/health
- * Health check for scraper endpoints (public - no auth required)
+ * @swagger
+ * /api/scraping/jobs/health:
+ *   get:
+ *     tags: [Health]
+ *     summary: Job scraper service health
+ *     description: Health check for the job scraper service. Also reports whether scrapers are enabled.
+ *     responses:
+ *       200:
+ *         description: Service status
  */
 router.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({
@@ -28,8 +35,32 @@ router.get('/health', (_req: Request, res: Response) => {
 router.use(verifyScraperApiKey);
 
 /**
- * POST /api/scraping/jobs/indeed
- * Run the Indeed job scraper
+ * @swagger
+ * /api/scraping/jobs/indeed:
+ *   post:
+ *     tags: [Scrapers]
+ *     summary: Run Indeed job scraper
+ *     description: |
+ *       Triggers an Indeed scraper run via Apify. Fetches jobs, deduplicates against existing DB records,
+ *       runs AI evaluation on each job, stores results, and sends a digest email. Typically triggered by cron.
+ *     security:
+ *       - ApiKeyAuth: []
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/ScraperRunRequest'
+ *     responses:
+ *       200:
+ *         description: Scraper run completed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ScraperRunResult'
+ *       401:
+ *         description: Missing or invalid API key
+ *       503:
+ *         description: Scraper is disabled
  */
 router.post('/indeed', async (req: Request, res: Response) => {
   const startTime = Date.now();
@@ -101,8 +132,30 @@ router.post('/indeed', async (req: Request, res: Response) => {
 });
 
 /**
- * POST /api/scraping/jobs/linkedin
- * Run the LinkedIn job scraper
+ * @swagger
+ * /api/scraping/jobs/linkedin:
+ *   post:
+ *     tags: [Scrapers]
+ *     summary: Run LinkedIn job scraper
+ *     description: Triggers a LinkedIn scraper run via Apify. Same pipeline as Indeed. Default maxItems is 10.
+ *     security:
+ *       - ApiKeyAuth: []
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/ScraperRunRequest'
+ *     responses:
+ *       200:
+ *         description: Scraper run completed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ScraperRunResult'
+ *       401:
+ *         description: Missing or invalid API key
+ *       503:
+ *         description: Scraper is disabled
  */
 router.post('/linkedin', async (req: Request, res: Response) => {
   const startTime = Date.now();
@@ -174,8 +227,32 @@ router.post('/linkedin', async (req: Request, res: Response) => {
 });
 
 /**
- * POST /api/scraping/jobs/af
- * Run the Arbetsformedlingen job scraper
+ * @swagger
+ * /api/scraping/jobs/af:
+ *   post:
+ *     tags: [Scrapers]
+ *     summary: Run Arbetsförmedlingen job scraper
+ *     description: |
+ *       Triggers an Arbetsförmedlingen scraper run via the free JobTech API (no Apify needed).
+ *       Includes API email fallback and pagination. Default maxItems is 100.
+ *     security:
+ *       - ApiKeyAuth: []
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/ScraperRunRequest'
+ *     responses:
+ *       200:
+ *         description: Scraper run completed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ScraperRunResult'
+ *       401:
+ *         description: Missing or invalid API key
+ *       503:
+ *         description: Scraper is disabled
  */
 router.post('/af', async (req: Request, res: Response) => {
   const startTime = Date.now();
@@ -246,8 +323,31 @@ router.post('/af', async (req: Request, res: Response) => {
 });
 
 /**
- * POST /api/scraping/jobs/cleanup
- * Clean up old jobs from the database
+ * @swagger
+ * /api/scraping/jobs/cleanup:
+ *   post:
+ *     tags: [Scrapers]
+ *     summary: Clean up old jobs
+ *     description: Deletes jobs older than the retention period (default 20 days) for each scraper source.
+ *     security:
+ *       - ApiKeyAuth: []
+ *     responses:
+ *       200:
+ *         description: Cleanup completed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 retentionDays: { type: integer, example: 20 }
+ *                 deletedBySource:
+ *                   type: object
+ *                   additionalProperties: { type: integer }
+ *                   example: { indeed: 10, linkedin: 5, arbetsformedlingen: 8 }
+ *                 totalDeleted: { type: integer, example: 23 }
+ *       401:
+ *         description: Missing or invalid API key
  */
 router.post('/cleanup', async (_req: Request, res: Response) => {
   try {

@@ -9,8 +9,15 @@ import { verifyScraperApiKey } from '../middleware/scraperAuth.js';
 const router: Router = Router();
 
 /**
- * GET /api/scraping/leads/health
- * Health check for lead scraper endpoints (public - no auth required)
+ * @swagger
+ * /api/scraping/leads/health:
+ *   get:
+ *     tags: [Health]
+ *     summary: Lead scraper service health
+ *     description: Health check for the lead scraper service. Also reports whether scrapers are enabled.
+ *     responses:
+ *       200:
+ *         description: Service status
  */
 router.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({
@@ -24,8 +31,53 @@ router.get('/health', (_req: Request, res: Response) => {
 router.use(verifyScraperApiKey);
 
 /**
- * POST /api/scraping/leads/google-maps
- * Run the Google Maps lead scraper
+ * @swagger
+ * /api/scraping/leads/google-maps:
+ *   post:
+ *     tags: [Scrapers]
+ *     summary: Run Google Maps lead scraper
+ *     description: |
+ *       Triggers a Google Maps lead scraper run via Apify. Finds companies on Google Maps,
+ *       runs AI evaluation on each, creates company + signal + contacts. Sends digest email.
+ *     security:
+ *       - ApiKeyAuth: []
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               searchQueries:
+ *                 type: array
+ *                 items: { type: string }
+ *                 example: ['tech companies Stockholm', 'IT companies Gothenburg']
+ *               maxItemsPerQuery: { type: integer, default: 50 }
+ *               countryFilter: { type: string, default: SE }
+ *     responses:
+ *       200:
+ *         description: Scraper run completed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 runId: { type: string }
+ *                 processingTime: { type: number }
+ *                 stats:
+ *                   type: object
+ *                   properties:
+ *                     fetched: { type: integer }
+ *                     afterFilter: { type: integer }
+ *                     processed: { type: integer }
+ *                     valid: { type: integer }
+ *                     discarded: { type: integer }
+ *                     contactsCreated: { type: integer }
+ *                     errors: { type: integer }
+ *       401:
+ *         description: Missing or invalid API key
+ *       503:
+ *         description: Scraper is disabled
  */
 router.post('/google-maps', async (req: Request, res: Response) => {
   const startTime = Date.now();
