@@ -8,6 +8,12 @@ import {
 } from '../services/healthCheckService.js';
 import { sendHealthCheckDigestEmail } from '../services/emailService.js';
 import { verifyScraperApiKey } from '../middleware/scraperAuth.js';
+import {
+  getJobs,
+  getJobById,
+  getCompanies,
+  getCompanyById,
+} from '../services/supabaseService.js';
 
 const router: Router = Router();
 
@@ -147,6 +153,136 @@ router.post('/health-check/send-digest', async (_req: Request, res: Response) =>
       success: false,
       error: getErrorMessage(error),
       processingTime,
+    });
+  }
+});
+
+// ============================================================================
+// DATA LISTING ENDPOINTS
+// ============================================================================
+
+/**
+ * GET /api/admin/jobs
+ * List jobs with optional filters
+ * Query params: source, ai_valid (true/false), from_date, to_date, limit, offset
+ */
+router.get('/jobs', async (req: Request, res: Response) => {
+  try {
+    const { source, ai_valid, from_date, to_date, limit, offset } = req.query;
+
+    const result = await getJobs({
+      source: source as string | undefined,
+      ai_valid: ai_valid !== undefined ? ai_valid === 'true' : undefined,
+      from_date: from_date as string | undefined,
+      to_date: to_date as string | undefined,
+      limit: limit ? parseInt(limit as string, 10) : undefined,
+      offset: offset ? parseInt(offset as string, 10) : undefined,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: result.data,
+      total: result.count,
+      limit: limit ? parseInt(limit as string, 10) : 50,
+      offset: offset ? parseInt(offset as string, 10) : 0,
+    });
+  } catch (error) {
+    logger.error('Failed to fetch jobs', error);
+
+    return res.status(500).json({
+      success: false,
+      error: getErrorMessage(error),
+    });
+  }
+});
+
+/**
+ * GET /api/admin/jobs/:id
+ * Get a single job with full details
+ */
+router.get('/jobs/:id', async (req: Request, res: Response) => {
+  try {
+    const job = await getJobById(req.params.id);
+
+    if (!job) {
+      return res.status(404).json({
+        success: false,
+        error: 'Job not found',
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: job,
+    });
+  } catch (error) {
+    logger.error('Failed to fetch job', error);
+
+    return res.status(500).json({
+      success: false,
+      error: getErrorMessage(error),
+    });
+  }
+});
+
+/**
+ * GET /api/admin/companies
+ * List companies with job/signal/contact counts
+ * Query params: status, source, limit, offset
+ */
+router.get('/companies', async (req: Request, res: Response) => {
+  try {
+    const { status, source, limit, offset } = req.query;
+
+    const result = await getCompanies({
+      status: status as string | undefined,
+      source: source as string | undefined,
+      limit: limit ? parseInt(limit as string, 10) : undefined,
+      offset: offset ? parseInt(offset as string, 10) : undefined,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: result.data,
+      total: result.count,
+      limit: limit ? parseInt(limit as string, 10) : 50,
+      offset: offset ? parseInt(offset as string, 10) : 0,
+    });
+  } catch (error) {
+    logger.error('Failed to fetch companies', error);
+
+    return res.status(500).json({
+      success: false,
+      error: getErrorMessage(error),
+    });
+  }
+});
+
+/**
+ * GET /api/admin/companies/:id
+ * Get a single company with all related jobs, signals, contacts
+ */
+router.get('/companies/:id', async (req: Request, res: Response) => {
+  try {
+    const company = await getCompanyById(req.params.id);
+
+    if (!company) {
+      return res.status(404).json({
+        success: false,
+        error: 'Company not found',
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: company,
+    });
+  } catch (error) {
+    logger.error('Failed to fetch company', error);
+
+    return res.status(500).json({
+      success: false,
+      error: getErrorMessage(error),
     });
   }
 });

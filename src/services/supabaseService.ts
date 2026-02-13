@@ -785,3 +785,147 @@ export async function upsertGoogleMapsContact(
   });
   return null;
 }
+
+// ============================================================================
+// ADMIN DATA ENDPOINTS — READ-ONLY QUERIES
+// ============================================================================
+
+/**
+ * Fetch jobs with optional filters. Includes company name via join.
+ */
+export async function getJobs(filters: {
+  source?: string;
+  ai_valid?: boolean;
+  from_date?: string;
+  to_date?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{ data: Record<string, unknown>[]; count: number }> {
+  try {
+    const limit = filters.limit ?? 50;
+    const offset = filters.offset ?? 0;
+
+    let query = supabase
+      .from('jobs')
+      .select(
+        'id, title, source, location, ai_valid, ai_score, ai_category, ai_experience, posted_date, external_url, application_email, salary, duration, published_status, is_ai_generated, created_at, company_id, companies(id, name, domain)',
+        { count: 'exact' }
+      )
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (filters.source) {
+      query = query.eq('source', filters.source);
+    }
+    if (filters.ai_valid !== undefined) {
+      query = query.eq('ai_valid', filters.ai_valid);
+    }
+    if (filters.from_date) {
+      query = query.gte('posted_date', filters.from_date);
+    }
+    if (filters.to_date) {
+      query = query.lte('posted_date', filters.to_date);
+    }
+
+    const { data, error, count } = await query;
+
+    if (error) throw error;
+
+    return { data: (data || []) as Record<string, unknown>[], count: count ?? 0 };
+  } catch (error) {
+    logger.error('Error fetching jobs', error);
+    throw new Error(`Failed to fetch jobs: ${getErrorMessage(error)}`);
+  }
+}
+
+/**
+ * Fetch a single job by ID with full details including company.
+ */
+export async function getJobById(
+  jobId: string
+): Promise<Record<string, unknown> | null> {
+  try {
+    const { data, error } = await supabase
+      .from('jobs')
+      .select(
+        '*, companies(id, name, domain, industry, current_score, website)'
+      )
+      .eq('id', jobId)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    return data as Record<string, unknown> | null;
+  } catch (error) {
+    logger.error('Error fetching job by ID', error);
+    throw new Error(`Failed to fetch job: ${getErrorMessage(error)}`);
+  }
+}
+
+/**
+ * Fetch companies with related counts (jobs, signals, contacts).
+ * Supabase doesn't support COUNT on nested relations directly,
+ * so we fetch the IDs and count client-side for simplicity.
+ */
+export async function getCompanies(filters: {
+  status?: string;
+  source?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{ data: Record<string, unknown>[]; count: number }> {
+  try {
+    const limit = filters.limit ?? 50;
+    const offset = filters.offset ?? 0;
+
+    const { data, error, count } = await supabase
+      .from('companies')
+      .select(
+        'id, name, domain, industry, region, current_score, status, source, website, linkedin_url, employee_count, company_size, enrichment_status, created_at, updated_at, jobs(id), signals(id), contacts(id)',
+        { count: 'exact' }
+      )
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error) throw error;
+
+    // Transform nested arrays to counts
+    const transformed = (data || []).map((company: Record<string, unknown>) => {
+      const { jobs, signals, contacts, ...rest } = company;
+      return {
+        ...rest,
+        job_count: Array.isArray(jobs) ? jobs.length : 0,
+        signal_count: Array.isArray(signals) ? signals.length : 0,
+        contact_count: Array.isArray(contacts) ? contacts.length : 0,
+      };
+    });
+
+    return { data: transformed, count: count ?? 0 };
+  } catch (error) {
+    logger.error('Error fetching companies', error);
+    throw new Error(`Failed to fetch companies: ${getErrorMessage(error)}`);
+  }
+}
+
+/**
+ * Fetch a single company by ID with all related data.
+ */
+export async function getCompanyById(
+  companyId: string
+): Promise<Record<string, unknown> | null> {
+  try {
+    const { data, error } = await supabase
+      .from('companies')
+      .select(
+        '*, jobs(id, title, source, location, ai_valid, ai_score, ai_category, posted_date, external_url, created_at), signals(id, signal_type, source, signal_date, captured_at, payload), contacts(id, full_name, email, phone, title, linkedin_url, source, source_method, created_at)'
+      )
+      .eq('id', companyId)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    return data as Record<string, unknown> | null;
+  } catch (error) {
+    logger.error('Error fetching company by ID', error);
+    throw new Error(`Failed to fetch company: ${getErrorMessage(error)}`);
+  }
+}
