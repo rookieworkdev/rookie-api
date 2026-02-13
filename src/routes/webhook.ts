@@ -41,7 +41,15 @@ const router: Router = express.Router();
  *       candidates and spam get stored for tracking. Always returns 200 to the caller.
  *
  *       **Auth:** Uses HMAC-SHA256 signature verification via `x-webhook-signature` header (not the API key).
+ *
+ *       **Tip:** Add `?dryRun=true` to get a mock response instantly without processing anything (skips signature check too).
  *     parameters:
+ *       - in: query
+ *         name: dryRun
+ *         schema:
+ *           type: boolean
+ *           default: false
+ *         description: If true, returns mock data without processing (for Swagger testing, skips signature verification)
  *       - in: header
  *         name: x-webhook-signature
  *         required: true
@@ -101,6 +109,19 @@ function maskPiiForLogging(body: Record<string, unknown>): Record<string, unknow
 
 router.post('/webhook', verifyWebhookSignature, async (req: Request, res: Response) => {
   const startTime = Date.now();
+
+  // Dry run: return mock data instantly (for Swagger testing)
+  if (req.query.dryRun === 'true') {
+    return res.status(200).json({
+      success: true,
+      dryRun: true,
+      message: 'Valid lead processed successfully',
+      classification: 'valid_lead',
+      lead_score: 82,
+      job_ad_title: 'Ekonomiassistent till Tech Company AB',
+      processingTime: 0,
+    });
+  }
 
   // Declare formData outside try block so it's accessible in catch
   let formData: FormData | undefined;

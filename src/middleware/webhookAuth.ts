@@ -23,6 +23,12 @@ declare global {
  * If WEBHOOK_SECRET is not configured, verification is skipped (for development).
  */
 export function verifyWebhookSignature(req: Request, res: Response, next: NextFunction): void {
+  // Skip verification for dry run requests (Swagger testing)
+  if (req.query.dryRun === 'true') {
+    next();
+    return;
+  }
+
   const secret = config.webhook.secret;
 
   // Skip verification if no secret is configured (development mode)
