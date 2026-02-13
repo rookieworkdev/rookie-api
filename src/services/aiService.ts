@@ -297,6 +297,7 @@ Phone: ${leadData.phone}
 Needs Description: ${leadData.needs_description}
 Service Type: ${leadData.service_type}
 Industry: ${leadData.industry}
+Experience Level: ${leadData.experience || 'not specified'}
 
 Provide your analysis in this exact JSON format:
 {

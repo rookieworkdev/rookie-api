@@ -14,6 +14,8 @@ export const webhookRequestSchema = z.object({
   service_type: z.string().optional(),
   message: z.string().optional(),
   subject: z.string().optional(),
+  experience: z.string().optional(),
+  consent: z.boolean().optional(),
 });
 
 /**

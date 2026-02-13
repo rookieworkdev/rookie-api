@@ -12,6 +12,7 @@ export interface FormData {
   service_type?: string;
   needs_description?: string;
   subject?: string;
+  experience?: string;
 }
 
 // Validation details from lead validation

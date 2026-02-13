@@ -63,6 +63,8 @@ const router: Router = express.Router();
  *               service_type: { type: string }
  *               message: { type: string }
  *               subject: { type: string }
+ *               experience: { type: string, description: 'Seniority level from form dropdown (student, junior, mid, any)', example: 'junior' }
+ *               consent: { type: boolean, description: 'GDPR consent checkbox (required by form, not stored separately)' }
  *     responses:
  *       200:
  *         description: Submission received and processed
@@ -134,6 +136,7 @@ router.post('/webhook', verifyWebhookSignature, async (req: Request, res: Respon
       service_type: validatedBody.service_type,
       needs_description: validatedBody.message,
       subject: validatedBody.subject,
+      experience: validatedBody.experience,
     };
 
     logger.info('Form data structured', { email: maskEmail(formData.email) });
