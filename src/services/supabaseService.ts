@@ -8,7 +8,6 @@ import type {
   JobAdWithCompanyId,
   SignalRecord,
   RejectedLeadRecord,
-  CandidateLeadRecord,
   ContactRecord,
   JobAdRecord,
 } from '../types/index.js';
@@ -125,42 +124,6 @@ export async function insertRejectedLead(
   }
 }
 
-/**
- * Inserts a candidate lead into candidate_leads
- * Replicates "Insert Candidate Lead" node
- */
-export async function insertCandidateLead(
-  leadData: FormData,
-  aiData: AIScoreResult
-): Promise<CandidateLeadRecord> {
-  try {
-    logger.info('Inserting candidate lead', { email: maskEmail(leadData.email) });
-
-    const { data, error } = await supabase
-      .from('candidate_leads')
-      .insert({
-        source: 'website_form',
-        full_name: leadData.full_name,
-        email: leadData.email,
-        phone: leadData.phone,
-        submitted_description: leadData.needs_description,
-        ai_reasoning: aiData.ai_reasoning,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      throw error;
-    }
-
-    logger.info('Candidate lead inserted', { leadId: data.id });
-
-    return data as CandidateLeadRecord;
-  } catch (error) {
-    logger.error('Error inserting candidate lead', error);
-    throw new Error(`Failed to insert candidate lead: ${getErrorMessage(error)}`);
-  }
-}
 
 /**
  * Upserts a contact record

@@ -11,7 +11,6 @@ import {
   findOrCreateCompany,
   createSignal,
   insertRejectedLead,
-  insertCandidateLead,
   upsertContact,
   createJobAdRecord,
 } from '../services/supabaseService.js';
@@ -315,9 +314,9 @@ router.post('/webhook', verifyWebhookSignature, async (req: Request, res: Respon
       }
 
       case 'likely_candidate': {
-        // Candidate path
+        // Candidate path — store in scraping_rejected_leads with classification='likely_candidate'
         logger.info('Processing likely candidate');
-        await insertCandidateLead(formData, aiScore);
+        await insertRejectedLead(formData, 'likely_candidate', aiScore.ai_reasoning);
 
         const response: WebhookSuccessResponse = {
           success: true,

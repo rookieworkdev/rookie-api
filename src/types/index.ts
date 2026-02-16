@@ -111,15 +111,6 @@ export interface RejectedLeadRecord {
   ai_reasoning?: string;
 }
 
-export interface CandidateLeadRecord {
-  id: string;
-  source: string;
-  full_name?: string;
-  email?: string;
-  phone?: string;
-  submitted_description?: string;
-  ai_reasoning?: string;
-}
 
 export interface ContactRecord {
   id: string;

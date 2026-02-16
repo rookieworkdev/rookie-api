@@ -135,22 +135,7 @@ CREATE TABLE rejected_leads (
 );
 ```
 
-#### 4. `candidate_leads`
-
-```sql
-CREATE TABLE candidate_leads (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  source TEXT NOT NULL,
-  full_name TEXT,
-  email TEXT,
-  phone TEXT,
-  submitted_description TEXT,
-  ai_reasoning TEXT,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-```
-
-#### 5. `contacts`
+#### 4. `contacts`
 
 ```sql
 CREATE TABLE contacts (
@@ -387,14 +372,14 @@ The AI classifies leads into 4 categories:
 
 - Job seekers (not employers)
 - Personal email describing themselves
-- **Action:** Store in candidate_leads
+- **Action:** Store in scraping_rejected_leads (classification='likely_candidate')
 
 ### 4. `likely_spam`
 
 - Promotional content
 - Malicious links
 - Incoherent text
-- **Action:** Store in rejected_leads (spam)
+- **Action:** Store in scraping_rejected_leads (classification='likely_spam')
 
 ## Deployment
 
