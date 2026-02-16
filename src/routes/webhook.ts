@@ -356,7 +356,7 @@ router.post('/webhook', verifyWebhookSignature, async (req: Request, res: Respon
     });
 
     emitAlert({
-      source: 'webhook',
+      source: 'website_form',
       stage: 'webhook_processing',
       severity: 'critical',
       title: 'Webhook processing failed',
@@ -372,7 +372,7 @@ router.post('/webhook', verifyWebhookSignature, async (req: Request, res: Respon
       } catch (saveError) {
         logger.error('Failed to save form data after error', saveError);
         emitAlert({
-          source: 'webhook',
+          source: 'website_form',
           stage: 'db_insert',
           severity: 'critical',
           title: 'Failed to save rejected lead after processing error',

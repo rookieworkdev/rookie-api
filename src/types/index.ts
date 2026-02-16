@@ -207,7 +207,7 @@ export interface WebhookSuccessResponse {
 
 // System alerts
 export type SystemAlertSource =
-  | 'webhook'
+  | 'website_form'
   | 'indeed_scraper'
   | 'linkedin_scraper'
   | 'arbetsformedlingen_scraper'

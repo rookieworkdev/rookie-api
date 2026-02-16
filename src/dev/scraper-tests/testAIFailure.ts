@@ -12,13 +12,11 @@
 import { createClient } from '@supabase/supabase-js';
 import { config } from '../../config/env.js';
 import { processJob } from '../../services/jobs/jobProcessor.js';
-import { findOrCreateCompany } from '../../services/supabaseService.js';
 import type { NormalizedJob } from '../../types/scraper.types.js';
 
 const supabase = createClient(config.supabase.url, config.supabase.key!);
 
 const TEST_COMPANY = '__TEST_AI_FAILURE_CO__';
-const TEST_DOMAIN = '__test-ai-failure__.test';
 
 let failures = 0;
 const pass = (msg: string) => console.log(`   ✅ PASS: ${msg}`);
