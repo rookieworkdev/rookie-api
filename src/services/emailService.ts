@@ -337,7 +337,7 @@ function generateAdminAlertHTML(
     </div>
 
     <div class="section">
-      <h2>Formulärdata (sparad i rejected_leads)</h2>
+      <h2>Formulärdata (sparad i scraping_rejected_leads)</h2>
       <div class="data-item"><strong>Namn:</strong> ${escapeHtml(formData.full_name || 'N/A')}</div>
       <div class="data-item"><strong>E-post:</strong> ${escapeHtml(formData.email || 'N/A')}</div>
       <div class="data-item"><strong>Telefon:</strong> ${escapeHtml(formData.phone || 'N/A')}</div>
@@ -352,7 +352,7 @@ function generateAdminAlertHTML(
     </div>
 
     <div class="footer">
-      <p><strong>Åtgärd:</strong> Formulärdatan har sparats i databasen (rejected_leads tabell med classification='processing_error'). Du kan granska och hantera denna inlämning manuellt via admin-portalen när den är klar.</p>
+      <p><strong>Åtgärd:</strong> Formulärdatan har sparats i databasen (scraping_rejected_leads tabell med classification='processing_error'). Du kan granska och hantera denna inlämning manuellt via admin-portalen när den är klar.</p>
       <p><strong>Nästa steg:</strong> Kontrollera felet och försök igen manuellt om nödvändigt.</p>
     </div>
   </div>

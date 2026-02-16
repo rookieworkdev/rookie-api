@@ -355,11 +355,11 @@ router.post('/webhook', verifyWebhookSignature, async (req: Request, res: Respon
       processingTime: Date.now() - startTime,
     });
 
-    // Save form data to rejected_leads so it's not lost
+    // Save form data to scraping_rejected_leads so it's not lost
     if (formData) {
       try {
         await insertRejectedLead(formData, 'processing_error', `Processing error: ${getErrorMessage(error)}`);
-        logger.info('Form data saved to rejected_leads after processing failure');
+        logger.info('Form data saved to scraping_rejected_leads after processing failure');
       } catch (saveError) {
         logger.error('Failed to save form data after error', saveError);
         // Continue anyway - we'll still send the alert

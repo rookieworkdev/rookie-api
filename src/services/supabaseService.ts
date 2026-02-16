@@ -51,7 +51,7 @@ export async function findOrCreateCompany(
 }
 
 /**
- * Creates a signal record in the signals table
+ * Creates a signal record in the scraping_signals table
  * Replicates the "Create Signal for Form Submission" node
  */
 export async function createSignal(
@@ -62,7 +62,7 @@ export async function createSignal(
     logger.info('Creating signal', { companyId });
 
     const { data, error } = await supabase
-      .from('signals')
+      .from('scraping_signals')
       .insert({
         company_id: companyId,
         signal_type: 'website_form_submission',
@@ -86,7 +86,7 @@ export async function createSignal(
 }
 
 /**
- * Inserts a rejected lead into rejected_leads table
+ * Inserts a rejected lead into scraping_rejected_leads table
  * Consolidated function for spam, invalid, and error cases
  */
 export async function insertRejectedLead(
@@ -98,7 +98,7 @@ export async function insertRejectedLead(
     logger.info('Inserting rejected lead', { email: maskEmail(leadData.email), classification });
 
     const { data, error } = await supabase
-      .from('rejected_leads')
+      .from('scraping_rejected_leads')
       .insert({
         full_name: leadData.full_name,
         email: leadData.email,
@@ -357,7 +357,7 @@ export async function createSignalForJobAd(
     const signalType = `${job.source}_job_ad`;
 
     const { data, error } = await supabase
-      .from('signals')
+      .from('scraping_signals')
       .insert({
         company_id: companyId,
         signal_type: signalType,
@@ -727,7 +727,7 @@ export async function createGoogleMapsSignal(
     logger.info('Creating Google Maps signal', { companyId });
 
     const { data, error } = await supabase
-      .from('signals')
+      .from('scraping_signals')
       .insert({
         company_id: companyId,
         signal_type: 'google_maps_listing',
@@ -880,7 +880,7 @@ export async function getCompanies(filters: {
     const { data, error, count } = await supabase
       .from('companies')
       .select(
-        'id, name, domain, industry, region, current_score, status, source, website, linkedin_url, employee_count, company_size, enrichment_status, created_at, updated_at, jobs(id), signals(id), contacts(id)',
+        'id, name, domain, industry, region, current_score, status, source, website, linkedin_url, employee_count, company_size, enrichment_status, created_at, updated_at, jobs(id), scraping_signals(id), contacts(id)',
         { count: 'exact' }
       )
       .order('created_at', { ascending: false })
@@ -890,11 +890,11 @@ export async function getCompanies(filters: {
 
     // Transform nested arrays to counts
     const transformed = (data || []).map((company: Record<string, unknown>) => {
-      const { jobs, signals, contacts, ...rest } = company;
+      const { jobs, scraping_signals, contacts, ...rest } = company;
       return {
         ...rest,
         job_count: Array.isArray(jobs) ? jobs.length : 0,
-        signal_count: Array.isArray(signals) ? signals.length : 0,
+        signal_count: Array.isArray(scraping_signals) ? scraping_signals.length : 0,
         contact_count: Array.isArray(contacts) ? contacts.length : 0,
       };
     });
@@ -916,7 +916,7 @@ export async function getCompanyById(
     const { data, error } = await supabase
       .from('companies')
       .select(
-        '*, jobs(id, title, source, location, ai_valid, ai_score, ai_category, posted_date, external_url, created_at), signals(id, signal_type, source, signal_date, captured_at, payload), contacts(id, full_name, email, phone, title, linkedin_url, source, source_method, created_at)'
+        '*, jobs(id, title, source, location, ai_valid, ai_score, ai_category, posted_date, external_url, created_at), scraping_signals(id, signal_type, source, signal_date, captured_at, payload), contacts(id, full_name, email, phone, title, linkedin_url, source, source_method, created_at)'
       )
       .eq('id', companyId)
       .maybeSingle();
@@ -971,7 +971,7 @@ export async function getContacts(filters: {
 }
 
 /**
- * Fetch signals with company name. Filterable by source and signal_type.
+ * Fetch scraping_signals with company name. Filterable by source and signal_type.
  */
 export async function getSignals(filters: {
   source?: string;
@@ -984,7 +984,7 @@ export async function getSignals(filters: {
     const offset = filters.offset ?? 0;
 
     let query = supabase
-      .from('signals')
+      .from('scraping_signals')
       .select(
         'id, signal_type, source, signal_date, captured_at, expired_at, score_contribution, payload, company_id, companies(id, name, domain)',
         { count: 'exact' }
@@ -1025,10 +1025,10 @@ export async function getDashboardSummary(): Promise<Record<string, unknown>> {
         supabase.from('companies').select('id', { count: 'exact', head: true }),
         supabase.from('jobs').select('id', { count: 'exact', head: true }),
         supabase.from('contacts').select('id', { count: 'exact', head: true }),
-        supabase.from('signals').select('id', { count: 'exact', head: true }),
+        supabase.from('scraping_signals').select('id', { count: 'exact', head: true }),
         supabase.from('companies').select('id', { count: 'exact', head: true }).gte('created_at', weekCutoff),
         supabase.from('jobs').select('id', { count: 'exact', head: true }).gte('created_at', weekCutoff),
-        supabase.from('signals').select('id', { count: 'exact', head: true }).gte('captured_at', weekCutoff),
+        supabase.from('scraping_signals').select('id', { count: 'exact', head: true }).gte('captured_at', weekCutoff),
       ]);
 
     return {

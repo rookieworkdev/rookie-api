@@ -38,9 +38,9 @@ const fail = (msg: string) => {
 };
 
 async function cleanup(companyId: string) {
-  // Delete in order: contacts, jobs (signals have cascade), signals, then company
+  // Delete in order: contacts, jobs (scraping_signals have cascade), scraping_signals, then company
   await supabase.from('contacts').delete().eq('company_id', companyId);
-  await supabase.from('signals').delete().eq('company_id', companyId);
+  await supabase.from('scraping_signals').delete().eq('company_id', companyId);
   await supabase.from('jobs').delete().eq('company_id', companyId);
   await supabase.from('companies').delete().eq('id', companyId);
 }
