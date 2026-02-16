@@ -5,6 +5,7 @@ import { runGoogleMapsFetch } from '../services/leads/googleMapsScraper.js';
 import { sendLeadScraperDigestEmail, sendScraperFailureAlert } from '../services/emailService.js';
 import { LeadScraperRunRequestSchema, type LeadScraperRunRequestType } from '../schemas/scraper.js';
 import { verifyScraperApiKey } from '../middleware/scraperAuth.js';
+import { emitAlert } from '../services/alertService.js';
 
 const router: Router = Router();
 
@@ -128,6 +129,14 @@ router.post('/google-maps', async (req: Request, res: Response) => {
     // 2. Send digest email (fire-and-forget)
     sendLeadScraperDigestEmail(result).catch((err) => {
       logger.error('Failed to send lead scraper digest email', err);
+      emitAlert({
+        source: 'email_service',
+        stage: 'email_send',
+        severity: 'warning',
+        title: 'Lead scraper digest email failed to send',
+        message: getErrorMessage(err),
+        metadata: { scraperSource: 'google_maps', runId: result.runId },
+      });
     });
 
     const processingTime = Date.now() - startTime;
@@ -156,6 +165,15 @@ router.post('/google-maps', async (req: Request, res: Response) => {
     logger.error('Google Maps lead scraper run failed', error, { processingTime });
 
     sendScraperFailureAlert('google_maps', error, { processingTime }).catch(() => {});
+
+    emitAlert({
+      source: 'google_maps_scraper',
+      stage: 'pipeline_failure',
+      severity: 'critical',
+      title: 'Google Maps scraper pipeline failed',
+      message: getErrorMessage(error),
+      metadata: { processingTime },
+    });
 
     return res.status(500).json({
       success: false,

@@ -204,3 +204,36 @@ export interface WebhookSuccessResponse {
   reason?: string;
   processingTime: number;
 }
+
+// System alerts
+export type SystemAlertSource =
+  | 'webhook'
+  | 'indeed_scraper'
+  | 'linkedin_scraper'
+  | 'arbetsformedlingen_scraper'
+  | 'google_maps_scraper'
+  | 'email_service';
+
+export type SystemAlertStage =
+  | 'apify_fetch'
+  | 'ai_evaluation'
+  | 'db_insert'
+  | 'email_send'
+  | 'pipeline_failure'
+  | 'webhook_processing';
+
+export type SystemAlertSeverity = 'critical' | 'warning' | 'info';
+
+export interface SystemAlert {
+  id: string;
+  source: SystemAlertSource;
+  stage: SystemAlertStage;
+  severity: SystemAlertSeverity;
+  title: string;
+  message: string;
+  metadata: Record<string, unknown>;
+  related_job_id: string | null;
+  related_company_id: string | null;
+  resolved_at: string | null;
+  created_at: string;
+}

@@ -23,6 +23,7 @@ import type {
   ProcessedCompany,
   LeadScraperRunResult,
 } from '../../types/scraper.types.js';
+import { emitAlert } from '../alertService.js';
 
 // ============================================================================
 // FETCH
@@ -218,6 +219,14 @@ export async function processCompany(
     } catch (aiError) {
       logger.error('AI company evaluation failed, saving with fallback', aiError, {
         name: company.name, domain: company.domain,
+      });
+      emitAlert({
+        source: 'google_maps_scraper',
+        stage: 'ai_evaluation',
+        severity: 'warning',
+        title: 'AI company evaluation failed — saved with fallback',
+        message: getErrorMessage(aiError),
+        metadata: { companyName: company.name, domain: company.domain },
       });
       evaluation = {
         isValid: false,
@@ -425,6 +434,15 @@ export async function runGoogleMapsFetch(runConfig?: {
     return result;
   } catch (error) {
     logger.error('Google Maps lead pipeline failed', error, { runId });
+
+    emitAlert({
+      source: 'google_maps_scraper',
+      stage: 'pipeline_failure',
+      severity: 'critical',
+      title: 'Google Maps lead pipeline failed',
+      message: getErrorMessage(error),
+      metadata: { runId },
+    });
 
     return {
       source: 'google_maps',

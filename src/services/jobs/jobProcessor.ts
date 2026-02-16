@@ -11,6 +11,8 @@ import {
   updateCompanyEnrichment,
 } from '../supabaseService.js';
 import { guessCompanyDomain } from './scraperUtils.js';
+import { emitAlert } from '../alertService.js';
+import type { SystemAlertSource } from '../../types/index.js';
 import type {
   NormalizedJob,
   JobEvaluationResult,
@@ -19,6 +21,10 @@ import type {
   ExtractedContact,
   JobScraperSource,
 } from '../../types/scraper.types.js';
+
+function scraperAlertSource(source: JobScraperSource): SystemAlertSource {
+  return `${source}_scraper` as SystemAlertSource;
+}
 
 /**
  * Deduplicate jobs against existing database records
@@ -148,6 +154,14 @@ export async function processJob(job: NormalizedJob): Promise<ProcessedJob> {
     } catch (aiError) {
       logger.error('AI evaluation failed, saving job with fallback evaluation', aiError, {
         title: job.title, company: job.company,
+      });
+      emitAlert({
+        source: scraperAlertSource(job.source as JobScraperSource),
+        stage: 'ai_evaluation',
+        severity: 'warning',
+        title: 'AI evaluation failed — job saved with fallback data',
+        message: getErrorMessage(aiError),
+        metadata: { jobTitle: job.title, company: job.company, source: job.source },
       });
       evaluation = {
         isValid: false,
@@ -395,6 +409,15 @@ export async function runJobProcessingPipeline(
     return result;
   } catch (error) {
     logger.error('Job processing pipeline failed', error, { runId });
+
+    emitAlert({
+      source: scraperAlertSource(source),
+      stage: 'pipeline_failure',
+      severity: 'critical',
+      title: `${source} job processing pipeline failed`,
+      message: getErrorMessage(error),
+      metadata: { runId, jobCount: jobs.length },
+    });
 
     return {
       source,

@@ -4,6 +4,7 @@ import { logger, getErrorMessage, maskEmail } from '../utils/logger.js';
 import type { FormData, JobAdData, EmailResponse } from '../types/index.js';
 import type { ScraperRunResult, ProcessedJob, LeadScraperRunResult, ProcessedCompany } from '../types/scraper.types.js';
 import type { HealthCheckResult, HealthCheckItem, HealthCheckSeverity } from '../types/healthCheck.types.js';
+import { emitAlert } from './alertService.js';
 
 const resend = new Resend(config.resend.apiKey);
 
@@ -389,6 +390,14 @@ export async function sendAdminAlert(
 
     if (emailError) {
       logger.error('Failed to send admin alert email', emailError);
+      emitAlert({
+        source: 'email_service',
+        stage: 'email_send',
+        severity: 'warning',
+        title: 'Admin alert email failed to send',
+        message: String(emailError),
+        metadata: { failurePoint },
+      });
       // Don't throw - we don't want alert failures to break the flow
       return null;
     }
@@ -400,6 +409,14 @@ export async function sendAdminAlert(
     return data as EmailResponse;
   } catch (err) {
     logger.error('Error sending admin alert email', err);
+    emitAlert({
+      source: 'email_service',
+      stage: 'email_send',
+      severity: 'warning',
+      title: 'Admin alert email failed to send',
+      message: getErrorMessage(err),
+      metadata: { failurePoint },
+    });
     // Don't throw - we don't want alert failures to break the flow
     return null;
   }
@@ -518,6 +535,14 @@ export async function sendScraperFailureAlert(
 
     if (emailError) {
       logger.error('Failed to send scraper failure alert email', emailError);
+      emitAlert({
+        source: 'email_service',
+        stage: 'email_send',
+        severity: 'warning',
+        title: 'Scraper failure alert email failed to send',
+        message: String(emailError),
+        metadata: { scraperSource: source },
+      });
       return null;
     }
 
@@ -526,6 +551,14 @@ export async function sendScraperFailureAlert(
     return data as EmailResponse;
   } catch (err) {
     logger.error('Error sending scraper failure alert email', err);
+    emitAlert({
+      source: 'email_service',
+      stage: 'email_send',
+      severity: 'warning',
+      title: 'Scraper failure alert email failed to send',
+      message: getErrorMessage(err),
+      metadata: { scraperSource: source },
+    });
     return null;
   }
 }

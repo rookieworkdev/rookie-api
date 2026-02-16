@@ -1008,3 +1008,53 @@ export async function getDashboardSummary(): Promise<Record<string, unknown>> {
     throw new Error(`Failed to fetch dashboard summary: ${getErrorMessage(error)}`);
   }
 }
+
+/**
+ * Fetch system alerts with optional filters.
+ * Default: last 7 days, limit 50, ordered by created_at DESC.
+ */
+export async function getAlerts(filters: {
+  source?: string;
+  severity?: string;
+  from_date?: string;
+  to_date?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{ data: Record<string, unknown>[]; count: number }> {
+  try {
+    const limit = filters.limit ?? 50;
+    const offset = filters.offset ?? 0;
+
+    const defaultFrom = new Date();
+    defaultFrom.setDate(defaultFrom.getDate() - 7);
+
+    let query = supabase
+      .from('system_alerts')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (filters.source) {
+      query = query.eq('source', filters.source);
+    }
+    if (filters.severity) {
+      query = query.eq('severity', filters.severity);
+    }
+
+    const fromDate = filters.from_date || defaultFrom.toISOString();
+    query = query.gte('created_at', fromDate);
+
+    if (filters.to_date) {
+      query = query.lte('created_at', filters.to_date);
+    }
+
+    const { data, error, count } = await query;
+
+    if (error) throw error;
+
+    return { data: (data || []) as Record<string, unknown>[], count: count ?? 0 };
+  } catch (error) {
+    logger.error('Error fetching system alerts', error);
+    throw new Error(`Failed to fetch system alerts: ${getErrorMessage(error)}`);
+  }
+}

@@ -9,6 +9,7 @@ import { deleteOldJobsBySource } from '../services/supabaseService.js';
 import { sendJobScraperDigestEmail, sendScraperFailureAlert } from '../services/emailService.js';
 import { ScraperRunRequestSchema, type ScraperRunRequestType } from '../schemas/scraper.js';
 import { verifyScraperApiKey } from '../middleware/scraperAuth.js';
+import { emitAlert } from '../services/alertService.js';
 
 const router: Router = Router();
 
@@ -116,6 +117,14 @@ router.post('/indeed', async (req: Request, res: Response) => {
     // 3. Send email digest (don't wait, don't fail if it errors)
     sendJobScraperDigestEmail(result).catch((err) => {
       logger.error('Failed to send scraper digest email', err);
+      emitAlert({
+        source: 'email_service',
+        stage: 'email_send',
+        severity: 'warning',
+        title: 'Scraper digest email failed to send',
+        message: getErrorMessage(err),
+        metadata: { scraperSource: 'indeed', runId: result.runId },
+      });
     });
 
     const processingTime = Date.now() - startTime;
@@ -143,6 +152,15 @@ router.post('/indeed', async (req: Request, res: Response) => {
     logger.error('Indeed scraper run failed', error, { processingTime });
 
     sendScraperFailureAlert('indeed', error, { processingTime }).catch(() => {});
+
+    emitAlert({
+      source: 'indeed_scraper',
+      stage: 'pipeline_failure',
+      severity: 'critical',
+      title: 'Indeed scraper pipeline failed',
+      message: getErrorMessage(error),
+      metadata: { processingTime },
+    });
 
     return res.status(500).json({
       success: false,
@@ -233,6 +251,14 @@ router.post('/linkedin', async (req: Request, res: Response) => {
     // 3. Send email digest (don't wait, don't fail if it errors)
     sendJobScraperDigestEmail(result).catch((err) => {
       logger.error('Failed to send scraper digest email', err);
+      emitAlert({
+        source: 'email_service',
+        stage: 'email_send',
+        severity: 'warning',
+        title: 'Scraper digest email failed to send',
+        message: getErrorMessage(err),
+        metadata: { scraperSource: 'linkedin', runId: result.runId },
+      });
     });
 
     const processingTime = Date.now() - startTime;
@@ -260,6 +286,15 @@ router.post('/linkedin', async (req: Request, res: Response) => {
     logger.error('LinkedIn scraper run failed', error, { processingTime });
 
     sendScraperFailureAlert('linkedin', error, { processingTime }).catch(() => {});
+
+    emitAlert({
+      source: 'linkedin_scraper',
+      stage: 'pipeline_failure',
+      severity: 'critical',
+      title: 'LinkedIn scraper pipeline failed',
+      message: getErrorMessage(error),
+      metadata: { processingTime },
+    });
 
     return res.status(500).json({
       success: false,
@@ -350,6 +385,14 @@ router.post('/af', async (req: Request, res: Response) => {
     // 3. Send email digest (don't wait, don't fail if it errors)
     sendJobScraperDigestEmail(result).catch((err) => {
       logger.error('Failed to send scraper digest email', err);
+      emitAlert({
+        source: 'email_service',
+        stage: 'email_send',
+        severity: 'warning',
+        title: 'Scraper digest email failed to send',
+        message: getErrorMessage(err),
+        metadata: { scraperSource: 'arbetsformedlingen', runId: result.runId },
+      });
     });
 
     const processingTime = Date.now() - startTime;
@@ -377,6 +420,15 @@ router.post('/af', async (req: Request, res: Response) => {
     logger.error('AF scraper run failed', error, { processingTime });
 
     sendScraperFailureAlert('arbetsformedlingen', error, { processingTime }).catch(() => {});
+
+    emitAlert({
+      source: 'arbetsformedlingen_scraper',
+      stage: 'pipeline_failure',
+      severity: 'critical',
+      title: 'AF scraper pipeline failed',
+      message: getErrorMessage(error),
+      metadata: { processingTime },
+    });
 
     return res.status(500).json({
       success: false,

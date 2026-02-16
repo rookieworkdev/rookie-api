@@ -16,6 +16,7 @@ import {
   getContacts,
   getSignals,
   getDashboardSummary,
+  getAlerts,
 } from '../services/supabaseService.js';
 
 const router: Router = Router();
@@ -714,6 +715,86 @@ router.get('/dashboard', async (_req: Request, res: Response) => {
     });
   } catch (error) {
     logger.error('Failed to fetch dashboard summary', error);
+
+    return res.status(500).json({
+      success: false,
+      error: getErrorMessage(error),
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/admin/alerts:
+ *   get:
+ *     tags: [Alerts]
+ *     summary: List system alerts
+ *     description: |
+ *       Paginated list of system alerts (pipeline failures, AI fallbacks, email errors).
+ *       Defaults to the last 7 days. Filter by source, severity, or custom date range.
+ *     security:
+ *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: source
+ *         schema:
+ *           type: string
+ *           enum: [webhook, indeed_scraper, linkedin_scraper, arbetsformedlingen_scraper, google_maps_scraper, email_service]
+ *         description: Filter by alert source
+ *       - in: query
+ *         name: severity
+ *         schema:
+ *           type: string
+ *           enum: [critical, warning, info]
+ *         description: Filter by severity level
+ *       - in: query
+ *         name: from_date
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *         description: Start of date range (default last 7 days)
+ *       - in: query
+ *         name: to_date
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *         description: End of date range
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 50
+ *       - in: query
+ *         name: offset
+ *         schema:
+ *           type: integer
+ *           default: 0
+ *     responses:
+ *       200:
+ *         description: Paginated list of system alerts
+ */
+router.get('/alerts', async (req: Request, res: Response) => {
+  try {
+    const { source, severity, from_date, to_date, limit, offset } = req.query;
+
+    const result = await getAlerts({
+      source: source as string | undefined,
+      severity: severity as string | undefined,
+      from_date: from_date as string | undefined,
+      to_date: to_date as string | undefined,
+      limit: limit ? parseInt(limit as string, 10) : undefined,
+      offset: offset ? parseInt(offset as string, 10) : undefined,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: result.data,
+      total: result.count,
+      limit: limit ? parseInt(limit as string, 10) : 50,
+      offset: offset ? parseInt(offset as string, 10) : 0,
+    });
+  } catch (error) {
+    logger.error('Failed to fetch alerts', error);
 
     return res.status(500).json({
       success: false,

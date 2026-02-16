@@ -20,6 +20,7 @@ import {
   formatValidationErrors,
 } from '../schemas/webhook.js';
 import { verifyWebhookSignature } from '../middleware/webhookAuth.js';
+import { emitAlert } from '../services/alertService.js';
 import type {
   FormData,
   WebhookSuccessResponse,
@@ -354,6 +355,15 @@ router.post('/webhook', verifyWebhookSignature, async (req: Request, res: Respon
       processingTime: Date.now() - startTime,
     });
 
+    emitAlert({
+      source: 'webhook',
+      stage: 'webhook_processing',
+      severity: 'critical',
+      title: 'Webhook processing failed',
+      message: getErrorMessage(error),
+      metadata: { body: maskPiiForLogging(req.body), processingTime: Date.now() - startTime },
+    });
+
     // Save form data to scraping_rejected_leads so it's not lost
     if (formData) {
       try {
@@ -361,7 +371,14 @@ router.post('/webhook', verifyWebhookSignature, async (req: Request, res: Respon
         logger.info('Form data saved to scraping_rejected_leads after processing failure');
       } catch (saveError) {
         logger.error('Failed to save form data after error', saveError);
-        // Continue anyway - we'll still send the alert
+        emitAlert({
+          source: 'webhook',
+          stage: 'db_insert',
+          severity: 'critical',
+          title: 'Failed to save rejected lead after processing error',
+          message: getErrorMessage(saveError),
+          metadata: { email: maskEmail(formData?.email) },
+        });
       }
 
       // Send admin alert email with form data and error details

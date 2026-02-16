@@ -133,6 +133,7 @@ app.get('/', (_req: Request, res: Response) => {
         companyDetail: 'GET /api/admin/companies/:id',
         contacts: 'GET /api/admin/contacts',
         signals: 'GET /api/admin/signals',
+        alerts: 'GET /api/admin/alerts',
       },
       docs: {
         swagger: 'GET /api/docs',
