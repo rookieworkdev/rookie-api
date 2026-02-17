@@ -165,7 +165,7 @@ function generateEmailHTML(jobAd: JobAdData, companyName: string): string {
 
         <h3>${escapeHtml(jobAd.title)}</h3>
         <h4>${escapeHtml(companyName)}</h4>
-        <div class="job-description">${jobAd.description}</div>
+        <div class="job-description">${escapeHtml(jobAd.description)}</div>
 
         <p><em>Du kan redigera och slutföra denna annons i företagsportalen.</em></p>
       </div>
