@@ -23,6 +23,9 @@
 	],
 	"author": "Rookie AB",
 	"license": "MIT",
+	"engines": {
+		"node": ">=20"
+	},
 	"dependencies": {
 		"@supabase/supabase-js": "^2.39.7",
 		"apify-client": "^2.22.0",
