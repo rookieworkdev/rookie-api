@@ -173,8 +173,8 @@ export interface Config {
   apify: {
     apiKey: string | undefined;
   };
+  rookieApiKey: string | undefined;
   scraper: {
-    apiKey: string | undefined;
     enabled: boolean;
     keywords: string;
     exclusionKeywords: string[];

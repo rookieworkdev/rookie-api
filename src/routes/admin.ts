@@ -7,7 +7,7 @@ import {
   getJobsBySource,
 } from '../services/healthCheckService.js';
 import { sendHealthCheckDigestEmail } from '../services/emailService.js';
-import { verifyScraperApiKey } from '../middleware/scraperAuth.js';
+import { verifyApiKey } from '../middleware/scraperAuth.js';
 import {
   getJobs,
   getJobById,
@@ -45,7 +45,7 @@ router.get('/health', (_req: Request, res: Response) => {
 });
 
 // Apply API key verification to all routes below
-router.use(verifyScraperApiKey);
+router.use(verifyApiKey);
 
 /**
  * @swagger

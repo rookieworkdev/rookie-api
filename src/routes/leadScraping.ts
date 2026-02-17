@@ -4,7 +4,7 @@ import { logger, getErrorMessage } from '../utils/logger.js';
 import { runGoogleMapsFetch } from '../services/leads/googleMapsScraper.js';
 import { sendLeadScraperDigestEmail, sendScraperFailureAlert } from '../services/emailService.js';
 import { LeadScraperRunRequestSchema, type LeadScraperRunRequestType } from '../schemas/scraper.js';
-import { verifyScraperApiKey } from '../middleware/scraperAuth.js';
+import { verifyApiKey } from '../middleware/scraperAuth.js';
 import { emitAlert } from '../services/alertService.js';
 
 const router: Router = Router();
@@ -29,7 +29,7 @@ router.get('/health', (_req: Request, res: Response) => {
 });
 
 // Apply API key verification to protected routes below
-router.use(verifyScraperApiKey);
+router.use(verifyApiKey);
 
 /**
  * @swagger

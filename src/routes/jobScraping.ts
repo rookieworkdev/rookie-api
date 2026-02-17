@@ -8,7 +8,7 @@ import { runJobProcessingPipeline } from '../services/jobs/jobProcessor.js';
 import { deleteOldJobsBySource } from '../services/supabaseService.js';
 import { sendJobScraperDigestEmail, sendScraperFailureAlert } from '../services/emailService.js';
 import { ScraperRunRequestSchema, type ScraperRunRequestType } from '../schemas/scraper.js';
-import { verifyScraperApiKey } from '../middleware/scraperAuth.js';
+import { verifyApiKey } from '../middleware/scraperAuth.js';
 import { emitAlert } from '../services/alertService.js';
 
 const router: Router = Router();
@@ -33,7 +33,7 @@ router.get('/health', (_req: Request, res: Response) => {
 });
 
 // Apply API key verification to protected routes below
-router.use(verifyScraperApiKey);
+router.use(verifyApiKey);
 
 /**
  * @swagger

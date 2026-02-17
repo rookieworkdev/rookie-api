@@ -48,9 +48,11 @@ export const config: Config = {
     apiKey: process.env.APIFY_API_KEY,
   },
 
+  // API key for all protected endpoints (admin, scrapers, etc.)
+  rookieApiKey: process.env.ROOKIE_API_KEY,
+
   // Job scraper settings
   scraper: {
-    apiKey: process.env.SCRAPER_API_KEY,
     enabled: process.env.SCRAPER_ENABLED !== 'false',
     keywords: process.env.SCRAPER_KEYWORDS || '',
     exclusionKeywords: process.env.SCRAPER_EXCLUSION_KEYWORDS?.split(',').map((k) => k.trim()) || [],
