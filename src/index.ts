@@ -10,6 +10,7 @@ import webhookRouter from './routes/webhook.js';
 import jobScrapingRouter from './routes/jobScraping.js';
 import leadScrapingRouter from './routes/leadScraping.js';
 import adminRouter from './routes/admin.js';
+import { startCronJobs } from './cron.js';
 // Import for Express Request type augmentation (adds rawBody property)
 import './middleware/webhookAuth.js';
 
@@ -179,6 +180,9 @@ if (process.env.VERCEL !== '1') {
       nodeEnv: config.nodeEnv,
       port: PORT,
     });
+
+    // Start cron jobs after server is ready to accept requests
+    startCronJobs();
   });
 
   // Graceful shutdown handler
