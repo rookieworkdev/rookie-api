@@ -28,7 +28,7 @@ x-api-key: <your-api-key>
 Add the API key to your environment:
 
 \`\`\`env
-ROOKIE_API_URL=http://localhost:8000
+ROOKIE_API_URL=https://rookie-api-production.up.railway.app
 ROOKIE_API_KEY=<your-api-key>
 \`\`\`
 
@@ -50,6 +50,14 @@ async function fetchAPI(path: string, options?: RequestInit) {
   return res.json()
 }
 \`\`\`
+
+---
+
+## Using Swagger UI
+
+1. Click the **Authorize** button (top right) and paste your API key
+2. All subsequent "Try it out" requests will include the \`x-api-key\` header automatically
+3. Expand any endpoint, click **Try it out**, adjust parameters, and click **Execute**
 
 ---
 
@@ -93,14 +101,11 @@ New scrapers are picked up automatically — stats queries use \`GROUP BY source
 
 ## Base URL
 
-**Local development:** \`http://localhost:8000\` (default port). Run with \`pnpm dev\` to start the server.
+**Production:** \`https://rookie-api-production.up.railway.app\`
 
-**Production:** Once deployed, the base URL will be the hosting platform URL, for example:
-- Render: \`https://rookie-api.onrender.com\`
-- Railway: \`https://rookie-api-production.up.railway.app\`
-- Custom subdomain: \`https://api.rookie.se\`
+**Local development:** \`http://localhost:8000\` — run with \`pnpm dev\`.
 
-The endpoint paths (\`/api/admin/jobs\`, \`/api/docs\`, etc.) stay the same — only the base URL changes. Update the \`ROOKIE_API_URL\` environment variable in your frontend when switching between local and production.
+The endpoint paths (\`/api/admin/jobs\`, \`/api/docs\`, etc.) stay the same — only the base URL changes. Set the \`ROOKIE_API_URL\` environment variable in your frontend to switch between local and production.
       `,
       contact: {
         name: 'Rookie AB',
@@ -108,12 +113,12 @@ The endpoint paths (\`/api/admin/jobs\`, \`/api/docs\`, etc.) stay the same — 
     },
     servers: [
       {
-        url: 'http://localhost:8000',
-        description: 'Local development',
+        url: 'https://rookie-api-production.up.railway.app',
+        description: 'Production (Railway)',
       },
       {
-        url: 'https://rookie-api.onrender.com',
-        description: 'Production (Render) — update URL after deployment',
+        url: 'http://localhost:8000',
+        description: 'Local development',
       },
     ],
     components: {
