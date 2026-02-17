@@ -47,6 +47,7 @@ async function callEndpoint(name: string, method: string, path: string): Promise
  *   06:00 daily  — Indeed job scraper
  *   07:00 daily  — LinkedIn job scraper
  *   08:00 daily  — Arbetsförmedlingen job scraper
+ *   10:00 Sunday — Google Maps lead scraper (weekly during dev, later every few months)
  *   00:00 Sunday — Expired job cleanup
  *   08:00 Monday — Health check digest email
  *
@@ -66,6 +67,11 @@ export function startCronJobs(): void {
     timezone: 'UTC',
   });
 
+  // Lead scrapers — weekly during development, reduce frequency once good coverage achieved
+  cron.schedule('0 10 * * 0', () => callEndpoint('Google Maps scraper', 'POST', '/api/scraping/leads/google-maps'), {
+    timezone: 'UTC',
+  });
+
   // Maintenance
   cron.schedule('0 0 * * 0', () => callEndpoint('Job cleanup', 'POST', '/api/scraping/jobs/cleanup'), {
     timezone: 'UTC',
@@ -76,11 +82,12 @@ export function startCronJobs(): void {
     timezone: 'UTC',
   });
 
-  logger.info('[cron] Scheduled 5 cron jobs', {
+  logger.info('[cron] Scheduled 6 cron jobs', {
     jobs: [
       'Indeed (daily 06:00 UTC)',
       'LinkedIn (daily 07:00 UTC)',
       'AF (daily 08:00 UTC)',
+      'Google Maps (Sunday 10:00 UTC)',
       'Cleanup (Sunday 00:00 UTC)',
       'Health digest (Monday 08:00 UTC)',
     ],
