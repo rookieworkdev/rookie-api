@@ -61,7 +61,7 @@ export const config: Config = {
 };
 
 // Validation
-const requiredEnvVars = ['OPENAI_API_KEY', 'SUPABASE_URL', 'SUPABASE_KEY', 'RESEND_API_KEY'];
+const requiredEnvVars = ['OPENROUTER_API_KEY', 'SUPABASE_URL', 'SUPABASE_KEY', 'RESEND_API_KEY'];
 const missing = requiredEnvVars.filter((key) => !process.env[key]);
 
 if (missing.length > 0 && process.env.NODE_ENV !== 'test') {

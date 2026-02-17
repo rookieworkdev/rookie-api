@@ -308,10 +308,13 @@ Provide your analysis in this exact JSON format:
 "ai_reasoning": "<short explanation of why this classification and score were assigned>"
 }`;
 
-    logger.info('Calling OpenAI for lead scoring');
+    const client = openRouterClient || openai;
+    const model = openRouterClient ? 'openai/gpt-4o-mini' : config.openai.model;
 
-    const response = await openai.chat.completions.create({
-      model: config.openai.model,
+    logger.info('Calling AI for lead scoring', { model });
+
+    const response = await client.chat.completions.create({
+      model,
       messages: [
         { role: 'system', content: SCORING_SYSTEM_PROMPT },
         { role: 'user', content: userPrompt },
@@ -385,10 +388,13 @@ Return ONLY valid JSON in this format:
   "posted_date": "${today}"
 }`;
 
-    logger.info('Calling OpenAI for job ad generation');
+    const client = openRouterClient || openai;
+    const model = openRouterClient ? 'openai/gpt-4o-mini' : config.openai.model;
 
-    const response = await openai.chat.completions.create({
-      model: config.openai.model,
+    logger.info('Calling AI for job ad generation', { model });
+
+    const response = await client.chat.completions.create({
+      model,
       messages: [
         { role: 'system', content: JOB_AD_SYSTEM_PROMPT },
         { role: 'user', content: userPrompt },
