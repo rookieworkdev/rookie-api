@@ -59,6 +59,10 @@ async function fetchAPI(path: string, options?: RequestInit) {
 2. All subsequent "Try it out" requests will include the \`x-api-key\` header automatically
 3. Expand any endpoint, click **Try it out**, adjust parameters, and click **Execute**
 
+**Endpoint types:**
+- **Blue (GET)** — Data endpoints for the admin portal: jobs, companies, contacts, signals, dashboard stats.
+- **Green (POST)** — Action triggers: run scrapers, send digest emails, cleanup. These are for cron jobs and manual maintenance, not for the portal UI.
+
 ---
 
 ## Error Responses
