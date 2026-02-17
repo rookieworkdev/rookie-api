@@ -258,9 +258,11 @@ export async function notifyAdmins(
   metadata?: Record<string, unknown>
 ): Promise<void> {
   try {
+    // Select user_id (FK to auth.users), not id (user_profiles PK)
+    // notifications.user_id references auth.users.id
     const { data: admins, error: adminError } = await supabase
       .from('user_profiles')
-      .select('id')
+      .select('user_id')
       .eq('role', 'admin');
 
     if (adminError || !admins?.length) {
@@ -269,7 +271,7 @@ export async function notifyAdmins(
     }
 
     const notifications = admins.map((admin) => ({
-      user_id: admin.id,
+      user_id: admin.user_id,
       category,
       title,
       body,
