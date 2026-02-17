@@ -13,6 +13,8 @@ import {
   insertRejectedLead,
   upsertContact,
   createJobAdRecord,
+  createClientAccessRequest,
+  notifyAdmins,
 } from '../services/supabaseService.js';
 import { sendEmailToLead, sendAdminAlert } from '../services/emailService.js';
 import {
@@ -284,6 +286,19 @@ router.post('/webhook', verifyWebhookSignature, async (req: Request, res: Respon
 
         // Step 14: Send Email to Lead
         await sendEmailToLead(formData.email || '', jobAd, formData.company_name || '');
+
+        // Step 15: Create client access request + notify admin (fire-and-forget)
+        createClientAccessRequest(formData).then((requestId) => {
+          if (requestId) {
+            notifyAdmins(
+              'access_request',
+              `Ny kundförfrågan från ${formData!.company_name || 'Okänt företag'}`,
+              `${formData!.full_name || 'Okänd'} har skickat en förfrågan.`,
+              `/access-requests/${requestId}`,
+              { accessRequestId: requestId, companyName: formData!.company_name }
+            );
+          }
+        });
 
         const response: WebhookSuccessResponse = {
           success: true,

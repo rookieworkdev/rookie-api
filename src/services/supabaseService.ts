@@ -207,6 +207,88 @@ export async function createJobAdRecord(
   }
 }
 
+/**
+ * Creates a client access request for the admin portal approval flow.
+ * Called when a valid lead submits the website form.
+ * Returns the created request ID (used for notification href), or null on failure.
+ */
+export async function createClientAccessRequest(
+  formData: FormData
+): Promise<string | null> {
+  try {
+    const nameParts = (formData.full_name || '').trim().split(/\s+/);
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+
+    const { data, error } = await supabase
+      .from('client_access_requests')
+      .insert({
+        email: formData.email || '',
+        first_name: firstName,
+        last_name: lastName,
+        company_name: formData.company_name || '',
+        phone: formData.phone || null,
+        message: formData.needs_description || null,
+        status: 'pending',
+      })
+      .select('id')
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    logger.info('Client access request created', { requestId: data.id });
+    return data.id as string;
+  } catch (error) {
+    logger.error('Error creating client access request', error);
+    return null;
+  }
+}
+
+/**
+ * Creates an in-app notification for all admin users.
+ * Fire-and-forget — never throws, never blocks the caller.
+ */
+export async function notifyAdmins(
+  category: string,
+  title: string,
+  body: string,
+  href?: string,
+  metadata?: Record<string, unknown>
+): Promise<void> {
+  try {
+    const { data: admins, error: adminError } = await supabase
+      .from('user_profiles')
+      .select('id')
+      .eq('role', 'admin');
+
+    if (adminError || !admins?.length) {
+      logger.warn('No admin users found for notification', { error: adminError?.message });
+      return;
+    }
+
+    const notifications = admins.map((admin) => ({
+      user_id: admin.id,
+      category,
+      title,
+      body,
+      href: href || null,
+      metadata: metadata || {},
+    }));
+
+    const { error } = await supabase.from('notifications').insert(notifications);
+
+    if (error) {
+      throw error;
+    }
+
+    logger.info('Admin notifications created', { count: admins.length, category });
+  } catch (error) {
+    logger.error('Error creating admin notification', error);
+  }
+}
+
 // ============================================================================
 // SCRAPER-SPECIFIC OPERATIONS
 // ============================================================================
