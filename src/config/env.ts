@@ -14,10 +14,10 @@ export const config: Config = {
     temperature: 0.7,
   },
 
-  // OpenRouter (for job evaluation with model fallback)
+  // OpenRouter (all AI calls routed through OpenRouter)
   openRouter: {
     apiKey: process.env.OPENROUTER_API_KEY,
-    primaryModel: 'openai/gpt-4o',
+    primaryModel: 'google/gemini-2.5-flash',
     fallbackModel: 'openai/gpt-4o-mini',
   },
 

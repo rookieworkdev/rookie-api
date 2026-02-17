@@ -3,7 +3,7 @@ import type { NormalizedGoogleMapsCompany } from '../types/scraper.types.js';
 
 /**
  * System prompt for Company Scoring AI Agent
- * Copied from the n8n Google Maps Scraper workflow "AI Company Scoring" node
+ * Originally from n8n Google Maps Scraper workflow, now maintained here as canonical source
  * Used to evaluate scraped companies for Rookie's target market
  */
 export const COMPANY_SCORING_SYSTEM_PROMPT = `You are a lead qualification AI for Rookie AB, a Swedish recruitment agency specializing in placing early-career white-collar candidates (0–8 years experience).

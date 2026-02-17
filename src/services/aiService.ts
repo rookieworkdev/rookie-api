@@ -45,7 +45,7 @@ const openai = new OpenAI({
 
 /**
  * System prompt for the Scoring AI Agent
- * Copied directly from the original n8n flow
+ * Originally from n8n flow, now maintained here as canonical source
  */
 const SCORING_SYSTEM_PROMPT = `# Rookie Lead Qualification Prompt
 
@@ -236,7 +236,7 @@ Win money fast! Visit www.get-rich-quick.biz to claim your prize.
 
 /**
  * System prompt for Job Ad Generation
- * Copied directly from the original n8n flow
+ * Originally from n8n flow, now maintained here as canonical source
  */
 const JOB_AD_SYSTEM_PROMPT = `You are a professional recruitment copywriter for Rookie AB, a Swedish recruitment agency. Generate compelling, professional job ads in Swedish that attract qualified candidates. Focus on clarity, professionalism, and highlighting opportunities.
 
@@ -284,7 +284,7 @@ Please submit your application as soon as possible.`;
 
 /**
  * Scores a lead using OpenAI
- * Replicates the "Scoring AI Agent" node in original n8n flow
+ * Scores a lead using AI (originally the "Scoring AI Agent" node in n8n)
  */
 export async function scoreLead(leadData: ValidatedLead | FormData): Promise<AIScoreResult> {
   try {
@@ -360,7 +360,7 @@ Provide your analysis in this exact JSON format:
 
 /**
  * Generates a job ad draft using OpenAI
- * Replicates the "Generate Job Ad Draft" node in original n8n flow
+ * Generates a job ad draft (originally the "Generate Job Ad Draft" node in n8n)
  */
 export async function generateJobAd(
   leadData: FormData,
@@ -449,7 +449,7 @@ const openRouterClient = config.openRouter.apiKey
 
 /**
  * Evaluates a scraped job using OpenRouter AI
- * Replicates the "Main AI Agent" node from n8n workflow
+ * Evaluates a scraped job using AI (originally the "Main AI Agent" node in n8n)
  */
 export async function evaluateJob(job: NormalizedJob): Promise<JobEvaluationResult> {
   const client = openRouterClient || openai;

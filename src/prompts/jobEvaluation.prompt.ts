@@ -3,7 +3,7 @@ import type { NormalizedJob } from '../types/scraper.types.js';
 
 /**
  * System prompt for Job Evaluation AI Agent
- * Copied from the n8n Indeed Job Scraper workflow
+ * Originally from n8n Indeed Job Scraper workflow, now maintained here as canonical source
  * Used to evaluate scraped job postings for Rookie's target market
  */
 export const JOB_EVALUATION_SYSTEM_PROMPT = `You are a Recruitment Filtering AI for Early-to-Mid Career roles (0 to 8 years experience).

@@ -29,7 +29,7 @@ interface SwitchData {
 
 /**
  * Validates lead data and performs spam detection
- * Replicates the "Lead Data Validation" code node in original n8n flow
+ * Originally the "Lead Data Validation" node in n8n, now maintained here
  */
 export function validateLead(lead: FormData): ValidatedLead {
   const validation: ValidationDetails = {
@@ -80,7 +80,7 @@ export function validateLead(lead: FormData): ValidatedLead {
 
 /**
  * Extracts domain from email or company name
- * Replicates the "Extract Domain" code node in original n8n flow
+ * Originally the "Extract Domain" node in n8n, now maintained here
  */
 export function extractDomain<T extends DataWithDomainInput>(data: T): T & DataWithDomainResult {
   let domain: string | null = null;
@@ -132,7 +132,7 @@ export function extractDomain<T extends DataWithDomainInput>(data: T): T & DataW
 
 /**
  * Normalizes company data across the flow
- * Replicates the "Normalize Company Data" code node in original n8n flow
+ * Originally the "Normalize Company Data" node in n8n, now maintained here
  */
 export function normalizeCompanyData(
   formData: FormData,
@@ -157,7 +157,7 @@ export function normalizeCompanyData(
 
 /**
  * Prepares contact data for upsert
- * Replicates the "Prepare Contact Data" code node in original n8n flow
+ * Originally the "Prepare Contact Data" node in n8n, now maintained here
  */
 export function prepareContactData(formData: FormData, switchData: SwitchData): ContactData {
   if (!formData.email) {
