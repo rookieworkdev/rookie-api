@@ -19,6 +19,10 @@ interface ErrorWithStatus extends Error {
 
 const app: Application = express();
 
+// Trust proxy (Railway, Render, etc. sit behind a reverse proxy)
+// Required for express-rate-limit to use the real client IP from X-Forwarded-For
+app.set('trust proxy', 1);
+
 // Security middleware
 app.use(helmet());
 
