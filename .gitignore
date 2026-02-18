@@ -48,4 +48,6 @@ build/
 # Notes and planning docs (all .md except README.md)
 *.md
 !README.md
+!TASKS.md
+!PRODUCTION_CHECKLIST.md
 .claude
