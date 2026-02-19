@@ -127,6 +127,10 @@ const CvParseRequestSchema = z.object({
  *                           issue_date: { type: string, nullable: true }
  *                           expiry_date: { type: string, nullable: true }
  *                           credential_url: { type: string, nullable: true }
+ *                     additional_notes:
+ *                       type: string
+ *                       nullable: true
+ *                       description: Catch-all for CV information that doesn't fit other sections (hobbies, volunteer work, publications, awards, etc.)
  *                 processingTime:
  *                   type: number
  *                   description: Processing time in milliseconds

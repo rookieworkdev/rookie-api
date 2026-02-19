@@ -78,6 +78,13 @@ You MUST return ONLY valid JSON matching the exact schema described below. No ma
 - **expiry_date**: Expiration date if applicable, null otherwise.
 - **credential_url**: URL to verify the credential, null if not present.
 
+### Additional Notes
+- **additional_notes**: A catch-all for any information in the CV that doesn't fit into the sections above.
+- Examples: hobbies/interests, volunteer work, publications, awards, personal projects, military service, driving license details beyond "Körkort B", or any other noteworthy information.
+- Combine all such items into a single string, separated by newlines. Preserve the original language.
+- Use null if there is nothing extra to capture (i.e. everything fits neatly into the structured sections above).
+- Do NOT repeat information already captured in other sections.
+
 ---
 
 ## OUTPUT FORMAT
@@ -96,7 +103,7 @@ ${cvText}
 
 ---
 
-Return ONLY valid JSON with these keys: profile, education, experience, skills, languages, references, certifications.`;
+Return ONLY valid JSON with these keys: profile, education, experience, skills, languages, references, certifications, additional_notes.`;
 }
 
 /**
@@ -164,6 +171,7 @@ export const CvParsedDataSchema = z.object({
       credential_url: z.string().nullable(),
     }),
   ),
+  additional_notes: z.string().nullable(),
 });
 
 export type CvParsedData = z.infer<typeof CvParsedDataSchema>;
