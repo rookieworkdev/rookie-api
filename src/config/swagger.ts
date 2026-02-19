@@ -318,6 +318,7 @@ The endpoint paths (\`/api/admin/jobs\`, \`/api/docs\`, etc.) stay the same — 
       { name: 'Stats', description: 'Aggregated statistics and health check data' },
       { name: 'Scrapers', description: 'Trigger scraper runs (typically called by cron jobs)' },
       { name: 'Webhook', description: 'Form submission webhook (called by the Rookie website)' },
+      { name: 'CV Parsing', description: 'AI-powered CV/resume parsing — extracts structured candidate data from PDF uploads' },
     ],
   },
   apis: ['./src/routes/*.ts'],

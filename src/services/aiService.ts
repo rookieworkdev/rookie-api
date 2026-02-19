@@ -20,6 +20,13 @@ import {
   generateCompanyScoringUserPrompt,
   CompanyScoringResponseSchema,
 } from '../prompts/companyScoring.prompt.js';
+import {
+  CV_PARSING_SYSTEM_PROMPT,
+  generateCvParsingUserPrompt,
+  CvParsedDataSchema,
+  type CvParsedData,
+} from '../prompts/cvParsing.prompt.js';
+import { CvParsingError } from './cvParsingService.js';
 
 // Zod schemas for AI response validation
 const AIScoreResultSchema = z.object({
@@ -711,4 +718,122 @@ async function evaluateCompanyWithFallback(company: NormalizedGoogleMapsCompany)
     industryCategory: validated.data.industry_category,
     sizeEstimate: validated.data.size_estimate,
   };
+}
+
+// ============================================================================
+// CV PARSING (for candidate resume extraction via OpenRouter)
+// ============================================================================
+
+// CV parsing uses Gemini 2.0 Flash as primary, GPT-4o-mini as fallback
+const CV_PARSING_PRIMARY_MODEL = 'google/gemini-2.0-flash-001';
+const CV_PARSING_FALLBACK_MODEL = 'openai/gpt-4o-mini';
+
+/**
+ * Parses CV text using AI to extract structured candidate data.
+ * Uses Gemini 2.0 Flash via OpenRouter, with GPT-4o-mini fallback.
+ */
+export async function parseCv(cvText: string): Promise<CvParsedData> {
+  const client = openRouterClient || openai;
+  const model = openRouterClient ? CV_PARSING_PRIMARY_MODEL : config.openai.model;
+
+  try {
+    logger.info('Parsing CV with AI', { textLength: cvText.length, model });
+
+    const userPrompt = generateCvParsingUserPrompt(cvText);
+
+    const response = await client.chat.completions.create({
+      model,
+      messages: [
+        { role: 'system', content: CV_PARSING_SYSTEM_PROMPT },
+        { role: 'user', content: userPrompt },
+      ],
+      temperature: 0.1,
+      response_format: { type: 'json_object' },
+    });
+
+    const content = response.choices[0].message.content;
+
+    if (!content) {
+      throw new Error('No content in AI response');
+    }
+
+    const cleanContent = content
+      .replace(/^```json\s*/i, '')
+      .replace(/\s*```\s*$/, '')
+      .trim();
+
+    const jsonParsed = JSON.parse(cleanContent);
+    const validated = CvParsedDataSchema.safeParse(jsonParsed);
+
+    if (!validated.success) {
+      logger.error('CV parsing response validation failed', {
+        errors: validated.error.errors,
+        rawContent: cleanContent.substring(0, 500),
+      });
+      throw new Error(`Invalid AI response structure: ${validated.error.message}`);
+    }
+
+    logger.info('CV parsing complete', {
+      educationCount: validated.data.education.length,
+      experienceCount: validated.data.experience.length,
+      skillsCount: validated.data.skills.length,
+    });
+
+    return validated.data;
+  } catch (error) {
+    // Try fallback model if primary fails and we're using OpenRouter
+    if (openRouterClient && model === CV_PARSING_PRIMARY_MODEL) {
+      logger.warn('Primary CV parsing model failed, trying fallback', { error: getErrorMessage(error) });
+      try {
+        return await parseCvWithFallback(cvText);
+      } catch (fallbackError) {
+        logger.error('Fallback CV parsing model also failed', fallbackError);
+        throw new CvParsingError('ai_failed', `CV parsing failed with both models: ${getErrorMessage(fallbackError)}`);
+      }
+    }
+
+    logger.error('Error parsing CV', error);
+    throw new CvParsingError('ai_failed', `CV parsing failed: ${getErrorMessage(error)}`);
+  }
+}
+
+/**
+ * Parse CV with fallback model (GPT-4o-mini via OpenRouter)
+ */
+async function parseCvWithFallback(cvText: string): Promise<CvParsedData> {
+  if (!openRouterClient) {
+    throw new Error('OpenRouter not configured for fallback');
+  }
+
+  const userPrompt = generateCvParsingUserPrompt(cvText);
+
+  const response = await openRouterClient.chat.completions.create({
+    model: CV_PARSING_FALLBACK_MODEL,
+    messages: [
+      { role: 'system', content: CV_PARSING_SYSTEM_PROMPT },
+      { role: 'user', content: userPrompt },
+    ],
+    temperature: 0.1,
+    response_format: { type: 'json_object' },
+  });
+
+  const content = response.choices[0].message.content;
+
+  if (!content) {
+    throw new Error('No content in fallback AI response');
+  }
+
+  const cleanContent = content
+    .replace(/^```json\s*/i, '')
+    .replace(/\s*```\s*$/, '')
+    .trim();
+
+  const jsonParsed = JSON.parse(cleanContent);
+  const validated = CvParsedDataSchema.safeParse(jsonParsed);
+
+  if (!validated.success) {
+    throw new Error(`Invalid fallback AI response: ${validated.error.message}`);
+  }
+
+  return validated.data;
 }
