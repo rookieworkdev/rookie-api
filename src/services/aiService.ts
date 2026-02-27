@@ -26,6 +26,12 @@ import {
   CvParsedDataSchema,
   type CvParsedData,
 } from '../prompts/cvParsing.prompt.js';
+import {
+  MATCH_SCORING_SYSTEM_PROMPT,
+  generateMatchScoringUserPrompt,
+  MatchScoringResponseSchema,
+  type MatchScoringPair,
+} from '../prompts/matchScoring.prompt.js';
 import { CvParsingError } from './cvParsingService.js';
 
 // Zod schemas for AI response validation
@@ -836,4 +842,120 @@ async function parseCvWithFallback(cvText: string): Promise<CvParsedData> {
   }
 
   return validated.data;
+}
+
+// ============================================================================
+// MATCH SCORING (candidate-job semantic relevance via OpenRouter)
+// ============================================================================
+
+// Match scoring uses Gemini 2.0 Flash as primary, GPT-4o-mini as fallback
+const MATCH_SCORING_PRIMARY_MODEL = 'google/gemini-2.0-flash-001';
+const MATCH_SCORING_FALLBACK_MODEL = 'openai/gpt-4o-mini';
+
+export interface MatchScoringResult {
+  pairId: string;
+  score: number;
+  reason: string;
+}
+
+/**
+ * Scores an array of candidate-job pairs for semantic relevance using AI.
+ * Returns an empty array on any error so callers can fall back to deterministic scores.
+ */
+export async function scoreMatchBatch(pairs: MatchScoringPair[]): Promise<MatchScoringResult[]> {
+  const client = openRouterClient || openai;
+  const model = openRouterClient ? MATCH_SCORING_PRIMARY_MODEL : config.openai.model;
+
+  try {
+    logger.info('Scoring match batch with AI', { count: pairs.length, model });
+
+    const userPrompt = generateMatchScoringUserPrompt(pairs);
+
+    const response = await client.chat.completions.create({
+      model,
+      messages: [
+        { role: 'system', content: MATCH_SCORING_SYSTEM_PROMPT },
+        { role: 'user', content: userPrompt },
+      ],
+      temperature: 0.2,
+      response_format: { type: 'json_object' },
+    });
+
+    const content = response.choices[0].message.content;
+
+    if (!content) {
+      throw new Error('No content in AI response');
+    }
+
+    const cleanContent = content
+      .replace(/^```json\s*/i, '')
+      .replace(/\s*```\s*$/, '')
+      .trim();
+
+    const jsonParsed = JSON.parse(cleanContent);
+    const validated = MatchScoringResponseSchema.safeParse(jsonParsed);
+
+    if (!validated.success) {
+      logger.warn('Match scoring response validation failed, trying fallback', {
+        errors: validated.error.errors,
+      });
+      if (openRouterClient && model === MATCH_SCORING_PRIMARY_MODEL) {
+        return await scoreMatchBatchWithFallback(pairs);
+      }
+      return [];
+    }
+
+    logger.info('Match batch scoring complete', { count: validated.data.results.length });
+    return validated.data.results;
+  } catch (error) {
+    if (openRouterClient && model === MATCH_SCORING_PRIMARY_MODEL) {
+      logger.warn('Primary match scoring model failed, trying fallback', { error: getErrorMessage(error) });
+      try {
+        return await scoreMatchBatchWithFallback(pairs);
+      } catch (fallbackError) {
+        logger.error('Fallback match scoring model also failed', fallbackError);
+        return [];
+      }
+    }
+    logger.error('Error scoring match batch', error);
+    return [];
+  }
+}
+
+async function scoreMatchBatchWithFallback(pairs: MatchScoringPair[]): Promise<MatchScoringResult[]> {
+  if (!openRouterClient) {
+    return [];
+  }
+
+  const userPrompt = generateMatchScoringUserPrompt(pairs);
+
+  const response = await openRouterClient.chat.completions.create({
+    model: MATCH_SCORING_FALLBACK_MODEL,
+    messages: [
+      { role: 'system', content: MATCH_SCORING_SYSTEM_PROMPT },
+      { role: 'user', content: userPrompt },
+    ],
+    temperature: 0.2,
+    response_format: { type: 'json_object' },
+  });
+
+  const content = response.choices[0].message.content;
+
+  if (!content) {
+    return [];
+  }
+
+  const cleanContent = content
+    .replace(/^```json\s*/i, '')
+    .replace(/\s*```\s*$/, '')
+    .trim();
+
+  const jsonParsed = JSON.parse(cleanContent);
+  const validated = MatchScoringResponseSchema.safeParse(jsonParsed);
+
+  if (!validated.success) {
+    return [];
+  }
+
+  return validated.data.results;
 }
