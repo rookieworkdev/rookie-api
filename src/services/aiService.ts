@@ -877,7 +877,7 @@ export async function scoreMatchBatch(pairs: MatchScoringPair[]): Promise<MatchS
         { role: 'system', content: MATCH_SCORING_SYSTEM_PROMPT },
         { role: 'user', content: userPrompt },
       ],
-      temperature: 0.2,
+      temperature: 0, // 0 = deterministic — same input always gives same score (score consistency across pages)
       response_format: { type: 'json_object' },
     });
 
@@ -935,7 +935,7 @@ async function scoreMatchBatchWithFallback(pairs: MatchScoringPair[]): Promise<M
       { role: 'system', content: MATCH_SCORING_SYSTEM_PROMPT },
       { role: 'user', content: userPrompt },
     ],
-    temperature: 0.2,
+    temperature: 0, // 0 = deterministic — same input always gives same score (score consistency across pages)
     response_format: { type: 'json_object' },
   });
 
