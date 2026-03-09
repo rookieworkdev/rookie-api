@@ -426,7 +426,7 @@ router.get('/jobs/:id', async (req: Request, res: Response) => {
  *     parameters:
  *       - in: query
  *         name: status
- *         schema: { type: string, enum: [backlog, active, inactive] }
+ *         schema: { type: string, enum: [pending, active, inactive] }
  *         description: Filter by company status
  *       - in: query
  *         name: source

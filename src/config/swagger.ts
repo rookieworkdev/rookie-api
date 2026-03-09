@@ -199,7 +199,7 @@ The endpoint paths (\`/api/admin/jobs\`, \`/api/docs\`, etc.) stay the same — 
             industry: { type: 'string', nullable: true },
             region: { type: 'string', nullable: true },
             current_score: { type: 'integer', example: 75 },
-            status: { type: 'string', example: 'backlog' },
+            status: { type: 'string', example: 'pending' },
             source: { type: 'array', items: { type: 'string' } },
             website: { type: 'string', nullable: true },
             linkedin_url: { type: 'string', nullable: true },

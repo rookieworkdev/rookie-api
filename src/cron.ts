@@ -3,13 +3,14 @@ import { config } from './config/env.js';
 import { logger } from './utils/logger.js';
 
 const BASE_URL = `http://localhost:${config.port}`;
+const PLATFORM_URL = process.env.PLATFORM_URL || 'http://localhost:3000';
 
 /**
  * Calls a local API endpoint with the ROOKIE_API_KEY header.
  * Used by cron jobs to trigger scraper runs, cleanup, and digest emails.
  */
-async function callEndpoint(name: string, method: string, path: string): Promise<void> {
-  const url = `${BASE_URL}${path}`;
+async function callEndpoint(name: string, method: string, path: string, baseUrl = BASE_URL): Promise<void> {
+  const url = `${baseUrl}${path}`;
   logger.info(`[cron] Starting: ${name}`, { path });
 
   try {
@@ -82,7 +83,13 @@ export function startCronJobs(): void {
     timezone: 'UTC',
   });
 
-  logger.info('[cron] Scheduled 6 cron jobs', {
+  // Match notifications — every 30 min, calls platform (Next.js) endpoint
+  // Jobs must be 20+ min old to avoid immediate sends after scraping
+  cron.schedule('*/30 * * * *', () => callEndpoint('Match notifications', 'GET', '/api/cron/match-notifications', PLATFORM_URL), {
+    timezone: 'UTC',
+  });
+
+  logger.info('[cron] Scheduled 7 cron jobs', {
     jobs: [
       'Indeed (daily 06:00 UTC)',
       'LinkedIn (daily 07:00 UTC)',
@@ -90,6 +97,7 @@ export function startCronJobs(): void {
       'Google Maps (Sunday 10:00 UTC)',
       'Cleanup (Sunday 00:00 UTC)',
       'Health digest (Monday 08:00 UTC)',
+      'Match notifications (every 30 min → platform)',
     ],
   });
 }
