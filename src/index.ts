@@ -12,6 +12,7 @@ import leadScrapingRouter from './routes/leadScraping.js';
 import adminRouter from './routes/admin.js';
 import cvParsingRouter from './routes/cvParsing.js';
 import matchingRouter from './routes/matching.js';
+import interviewRouter from './routes/interview.js';
 import { startCronJobs } from './cron.js';
 // Import for Express Request type augmentation (adds rawBody property)
 import './middleware/webhookAuth.js';
@@ -86,6 +87,7 @@ app.use('/api/scraping/leads', leadScrapingRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/cv', cvParsingRouter);
 app.use('/api/matching', matchingRouter);
+app.use('/api/interview', interviewRouter);
 
 // Swagger UI - interactive API docs
 // Accessible at /api/docs (pass API key as query param ?api_key=... or use the Authorize button)
@@ -149,6 +151,10 @@ app.get('/', (_req: Request, res: Response) => {
       },
       matching: {
         scoreBatch: 'POST /api/matching/score-batch',
+      },
+      interview: {
+        evaluate: 'POST /api/interview/evaluate',
+        health: 'GET /api/interview/health',
       },
       docs: {
         swagger: 'GET /api/docs',

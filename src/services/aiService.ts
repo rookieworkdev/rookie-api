@@ -32,6 +32,12 @@ import {
   MatchScoringResponseSchema,
   type MatchScoringPair,
 } from '../prompts/matchScoring.prompt.js';
+import {
+  INTERVIEW_EVALUATION_SYSTEM_PROMPT,
+  generateInterviewEvaluationUserPrompt,
+  InterviewEvaluationResponseSchema,
+  type InterviewEvaluationResponse,
+} from '../prompts/interviewEvaluation.prompt.js';
 import { CvParsingError } from './cvParsingService.js';
 
 // Zod schemas for AI response validation
@@ -958,4 +964,130 @@ async function scoreMatchBatchWithFallback(pairs: MatchScoringPair[]): Promise<M
   }
 
   return validated.data.results;
+}
+
+// ============================================================================
+// INTERVIEW EVALUATION (voice interview transcript evaluation via OpenRouter)
+// ============================================================================
+
+const INTERVIEW_EVAL_PRIMARY_MODEL = 'openai/gpt-4o';
+
+/**
+ * Transcribe audio using Groq Whisper Turbo API.
+ * Returns the transcript text, or null on failure.
+ */
+export async function transcribeAudio(audioUrl: string): Promise<string | null> {
+  if (!config.groq.apiKey) {
+    logger.warn('GROQ_API_KEY not configured, skipping transcription');
+    return null;
+  }
+
+  try {
+    // Download audio from URL
+    const audioResponse = await fetch(audioUrl);
+    if (!audioResponse.ok) {
+      logger.error('Failed to download audio', { status: audioResponse.status, url: audioUrl });
+      return null;
+    }
+
+    const audioBuffer = await audioResponse.arrayBuffer();
+    const blob = new Blob([audioBuffer], { type: 'audio/webm' });
+
+    const formData = new FormData();
+    formData.append('file', blob, 'recording.webm');
+    formData.append('model', 'whisper-large-v3-turbo');
+    formData.append('response_format', 'json');
+
+    const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${config.groq.apiKey}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      logger.error('Groq transcription failed', { status: response.status, error: errorText });
+      return null;
+    }
+
+    const result = await response.json() as { text: string };
+    return result.text || null;
+  } catch (error) {
+    logger.error('Groq transcription error', error as Error);
+    return null;
+  }
+}
+
+/**
+ * Evaluate an interview recording by:
+ * 1. Transcribing audio via Groq Whisper
+ * 2. Evaluating transcript via LLM (OpenRouter GPT-4o)
+ */
+export async function evaluateInterviewRecording(
+  audioUrl: string,
+  question: string,
+  candidateProfile: string,
+): Promise<{ transcript: string | null; evaluation: InterviewEvaluationResponse | null }> {
+  // Step 1: Transcribe
+  const transcript = await transcribeAudio(audioUrl);
+
+  if (!transcript) {
+    logger.warn('No transcript available, skipping evaluation', { audioUrl });
+    return { transcript: null, evaluation: null };
+  }
+
+  // Step 2: Evaluate transcript via LLM
+  const client = openRouterClient || openai;
+  const model = openRouterClient ? INTERVIEW_EVAL_PRIMARY_MODEL : config.openai.model;
+
+  try {
+    const userPrompt = generateInterviewEvaluationUserPrompt({
+      question,
+      candidateProfile,
+      transcript,
+    });
+
+    const response = await client.chat.completions.create({
+      model,
+      messages: [
+        { role: 'system', content: INTERVIEW_EVALUATION_SYSTEM_PROMPT },
+        { role: 'user', content: userPrompt },
+      ],
+      temperature: 0.3,
+      max_tokens: 1000,
+    });
+
+    const content = response.choices[0].message.content;
+    if (!content) {
+      logger.warn('Empty LLM response for interview evaluation');
+      return { transcript, evaluation: null };
+    }
+
+    const cleanContent = content
+      .replace(/^```json\s*/i, '')
+      .replace(/\s*```\s*$/, '')
+      .trim();
+
+    const jsonParsed = JSON.parse(cleanContent);
+    const validated = InterviewEvaluationResponseSchema.safeParse(jsonParsed);
+
+    if (!validated.success) {
+      logger.warn('Interview evaluation response validation failed', {
+        errors: validated.error.errors,
+      });
+      return { transcript, evaluation: null };
+    }
+
+    logger.info('Interview evaluation completed', {
+      question: question.substring(0, 50),
+      overall: validated.data.overall,
+    });
+
+    return { transcript, evaluation: validated.data };
+  } catch (error) {
+    logger.error('Interview evaluation error', error as Error);
+    return { transcript, evaluation: null };
+  }
 }

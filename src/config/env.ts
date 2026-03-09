@@ -48,6 +48,11 @@ export const config: Config = {
     apiKey: process.env.APIFY_API_KEY,
   },
 
+  // Groq (for Whisper STT transcription)
+  groq: {
+    apiKey: process.env.GROQ_API_KEY,
+  },
+
   // API key for all protected endpoints (admin, scrapers, etc.)
   rookieApiKey: process.env.ROOKIE_API_KEY,
 
