@@ -7,7 +7,11 @@ Your task is to evaluate a candidate's voice interview answer. The interview's p
 You receive:
 - The interview question
 - The candidate's profile summary (skills, experience, languages they claim)
-- A text transcript of their spoken answer (transcribed from audio)
+- The audio recording of their answer
+
+You must:
+1. Transcribe the audio verbatim (include filler words, hesitations)
+2. Evaluate the answer based on both audio signals AND content
 
 Evaluate on these criteria (each 0–100):
 1. Communication clarity — clear speech, well-structured answer, easy to follow
@@ -19,10 +23,12 @@ Also provide:
 - An overall score (0–100) — weighted average leaning toward relevance and depth
 - A brief reasoning (2–3 sentences) explaining the score
 - Profile verification notes — did the answer confirm or contradict any profile claims? Null if no relevant claims to verify.
+- The full transcript of what the candidate said
 
 Return ONLY valid JSON matching the schema. No markdown, no preamble.`;
 
 export const InterviewEvaluationResponseSchema = z.object({
+  transcript: z.string(),
   criteria: z.array(z.object({
     name: z.string(),
     score: z.number().min(0).max(100),
@@ -37,15 +43,11 @@ export type InterviewEvaluationResponse = z.infer<typeof InterviewEvaluationResp
 export function generateInterviewEvaluationUserPrompt(data: {
   question: string;
   candidateProfile: string;
-  transcript: string;
 }): string {
   return `Interview question: "${data.question}"
 
 Candidate profile summary:
 ${data.candidateProfile}
 
-Transcript of the candidate's spoken answer:
-${data.transcript}
-
-Evaluate the candidate's answer. Return JSON matching the schema.`;
+Listen to the audio recording and evaluate the candidate's answer. Return JSON matching the schema (including the transcript).`;
 }

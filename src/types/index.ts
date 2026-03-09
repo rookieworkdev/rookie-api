@@ -173,9 +173,6 @@ export interface Config {
   apify: {
     apiKey: string | undefined;
   };
-  groq: {
-    apiKey: string | undefined;
-  };
   rookieApiKey: string | undefined;
   scraper: {
     enabled: boolean;

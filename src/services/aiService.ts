@@ -967,102 +967,66 @@ async function scoreMatchBatchWithFallback(pairs: MatchScoringPair[]): Promise<M
 }
 
 // ============================================================================
-// INTERVIEW EVALUATION (voice interview transcript evaluation via OpenRouter)
+// INTERVIEW EVALUATION (multimodal audio evaluation via OpenRouter GPT-4o)
 // ============================================================================
 
 const INTERVIEW_EVAL_PRIMARY_MODEL = 'openai/gpt-4o';
 
 /**
- * Transcribe audio using Groq Whisper Turbo API.
- * Returns the transcript text, or null on failure.
- */
-export async function transcribeAudio(audioUrl: string): Promise<string | null> {
-  if (!config.groq.apiKey) {
-    logger.warn('GROQ_API_KEY not configured, skipping transcription');
-    return null;
-  }
-
-  try {
-    // Download audio from URL
-    const audioResponse = await fetch(audioUrl);
-    if (!audioResponse.ok) {
-      logger.error('Failed to download audio', { status: audioResponse.status, url: audioUrl });
-      return null;
-    }
-
-    const audioBuffer = await audioResponse.arrayBuffer();
-    const blob = new Blob([audioBuffer], { type: 'audio/webm' });
-
-    const formData = new FormData();
-    formData.append('file', blob, 'recording.webm');
-    formData.append('model', 'whisper-large-v3-turbo');
-    formData.append('response_format', 'json');
-
-    const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${config.groq.apiKey}`,
-      },
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      logger.error('Groq transcription failed', { status: response.status, error: errorText });
-      return null;
-    }
-
-    const result = await response.json() as { text: string };
-    return result.text || null;
-  } catch (error) {
-    logger.error('Groq transcription error', error as Error);
-    return null;
-  }
-}
-
-/**
- * Evaluate an interview recording by:
- * 1. Transcribing audio via Groq Whisper
- * 2. Evaluating transcript via LLM (OpenRouter GPT-4o)
+ * Evaluate an interview recording using multimodal GPT-4o.
+ * Sends the audio directly — GPT-4o transcribes + evaluates in one pass.
+ * Returns both the transcript and structured evaluation scores.
  */
 export async function evaluateInterviewRecording(
   audioUrl: string,
   question: string,
   candidateProfile: string,
-): Promise<{ transcript: string | null; evaluation: InterviewEvaluationResponse | null }> {
-  // Step 1: Transcribe
-  const transcript = await transcribeAudio(audioUrl);
-
-  if (!transcript) {
-    logger.warn('No transcript available, skipping evaluation', { audioUrl });
-    return { transcript: null, evaluation: null };
-  }
-
-  // Step 2: Evaluate transcript via LLM
+): Promise<{ transcript: string | null; evaluation: Omit<InterviewEvaluationResponse, 'transcript'> | null }> {
   const client = openRouterClient || openai;
   const model = openRouterClient ? INTERVIEW_EVAL_PRIMARY_MODEL : config.openai.model;
 
   try {
+    // Download audio and encode as base64 for multimodal input
+    const audioResponse = await fetch(audioUrl);
+    if (!audioResponse.ok) {
+      logger.error('Failed to download audio', { status: audioResponse.status, url: audioUrl });
+      return { transcript: null, evaluation: null };
+    }
+
+    const audioBuffer = await audioResponse.arrayBuffer();
+    const base64Audio = Buffer.from(audioBuffer).toString('base64');
+
     const userPrompt = generateInterviewEvaluationUserPrompt({
       question,
       candidateProfile,
-      transcript,
     });
 
     const response = await client.chat.completions.create({
       model,
       messages: [
         { role: 'system', content: INTERVIEW_EVALUATION_SYSTEM_PROMPT },
-        { role: 'user', content: userPrompt },
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: userPrompt },
+            {
+              type: 'input_audio',
+              input_audio: {
+                data: base64Audio,
+                format: 'wav',
+              },
+            } as any,
+          ],
+        },
       ],
       temperature: 0.3,
-      max_tokens: 1000,
+      max_tokens: 2000,
     });
 
     const content = response.choices[0].message.content;
     if (!content) {
       logger.warn('Empty LLM response for interview evaluation');
-      return { transcript, evaluation: null };
+      return { transcript: null, evaluation: null };
     }
 
     const cleanContent = content
@@ -1077,17 +1041,20 @@ export async function evaluateInterviewRecording(
       logger.warn('Interview evaluation response validation failed', {
         errors: validated.error.errors,
       });
-      return { transcript, evaluation: null };
+      return { transcript: null, evaluation: null };
     }
+
+    const { transcript, ...evaluation } = validated.data;
 
     logger.info('Interview evaluation completed', {
       question: question.substring(0, 50),
-      overall: validated.data.overall,
+      overall: evaluation.overall,
+      transcriptLength: transcript.length,
     });
 
-    return { transcript, evaluation: validated.data };
+    return { transcript, evaluation };
   } catch (error) {
     logger.error('Interview evaluation error', error as Error);
-    return { transcript, evaluation: null };
+    return { transcript: null, evaluation: null };
   }
 }
