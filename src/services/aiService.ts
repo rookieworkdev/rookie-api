@@ -967,15 +967,15 @@ async function scoreMatchBatchWithFallback(pairs: MatchScoringPair[]): Promise<M
 }
 
 // ============================================================================
-// INTERVIEW EVALUATION (multimodal audio evaluation via OpenRouter GPT-4o)
+// INTERVIEW EVALUATION (multimodal audio evaluation via OpenRouter Gemini)
 // ============================================================================
 
-const INTERVIEW_EVAL_PRIMARY_MODEL = 'openai/gpt-4o';
+const INTERVIEW_EVAL_PRIMARY_MODEL = 'google/gemini-2.5-flash';
 
 /**
- * Evaluate an interview recording using multimodal GPT-4o.
- * Sends the audio directly — GPT-4o transcribes + evaluates in one pass.
- * Returns both the transcript and structured evaluation scores.
+ * Evaluate an interview recording using multimodal Gemini 2.5 Flash.
+ * Sends the audio directly — Gemini transcribes + evaluates in one pass.
+ * Gemini natively supports audio/webm (opus codec) — no conversion needed.
  */
 export async function evaluateInterviewRecording(
   audioUrl: string,
@@ -1013,7 +1013,7 @@ export async function evaluateInterviewRecording(
               type: 'input_audio',
               input_audio: {
                 data: base64Audio,
-                format: 'wav',
+                format: 'ogg',
               },
             } as any,
           ],
