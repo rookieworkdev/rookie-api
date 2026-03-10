@@ -25,7 +25,20 @@ Also provide:
 - Profile verification notes — did the answer confirm or contradict any profile claims? Null if no relevant claims to verify.
 - The full transcript of what the candidate said
 
-Return ONLY valid JSON matching the schema. No markdown, no preamble.`;
+Return ONLY valid JSON with EXACTLY these field names (camelCase). No markdown, no code fences, no preamble.
+
+{
+  "transcript": "full verbatim transcript here",
+  "criteria": [
+    {"name": "Communication clarity", "score": 0},
+    {"name": "Relevance", "score": 0},
+    {"name": "Depth", "score": 0},
+    {"name": "Confidence", "score": 0}
+  ],
+  "overall": 0,
+  "reasoning": "2-3 sentence explanation",
+  "profileVerification": "notes or null"
+}`;
 
 export const InterviewEvaluationResponseSchema = z.object({
   transcript: z.string(),
