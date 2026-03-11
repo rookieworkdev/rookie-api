@@ -1,5 +1,5 @@
-import { z } from 'zod';
-import type { NormalizedGoogleMapsCompany } from '../types/scraper.types.js';
+import { z } from 'zod'
+import type { NormalizedGoogleMapsCompany } from '../types/scraper.types.js'
 
 /**
  * System prompt for Company Scoring AI Agent
@@ -82,7 +82,7 @@ Size is a **modifier**, not a gate.
 **ONLY disqualify if the company name EXACTLY matches one of the names below.**
 
 **Known competitors – EXACT NAME MATCHES ONLY:**
-Academic Work, Adecco, Manpower, Randstad, Poolia, TNG, Proffice, Jefferson Wells, Wise Professionals, Ants, Nexer Recruit, Incluso, StudentConsulting, Lernia, Barona, Uniflex, Bemannia, Hays, Robert Half, Michael Page, KFX, Competens, Academic Search, Amendo, Arena Personal, Eventpersonal.se, Human Online, Kontorsfixarna, Inhouse, The Place, WOOW, SalesOnly, Rubino Rekrytering, Swesale, Säljpoolen, Made for Sales, Teknisk Säljkraft, Fincruit.
+Academic Work, Academic Work Sweden AB, Adecco, Manpower, Randstad, Poolia, TNG, Proffice, Jefferson Wells, Wise Professionals, Ants, Nexer Recruit, Incluso, StudentConsulting, Lernia, Barona, Uniflex, Bemannia, Hays, Robert Half, Michael Page, KFX, Competens, Academic Search, Amendo, Arena Personal, Eventpersonal.se, Human Online, Kontorsfixarna, Inhouse, The Place, WOOW, SalesOnly, Rubino Rekrytering, Swesale, Säljpoolen, Made for Sales, Teknisk Säljkraft, Fincruit.
 
 **Critical rules:**
 
@@ -118,24 +118,24 @@ Score must be 0–30 and \`"isValid": false\`.
   "industry_category": "one of Ekonom, Ingenjör, IT/Teknik, Kundtjänst, Administration, Sälj/Marknad, Logistik, HR, Juridik, Finansiella tjänster/Bank, Forskning/Utveckling, Teknisk support/Drift, Kreativ/Design/Media, Produktion/Manufacturing, Bygg/Anläggning, Other",
   "size_estimate": "Large/Medium/Small/Unknown"
 }
-\`\`\``;
+\`\`\``
 
 /**
  * Generate user prompt for company scoring
  */
 export function generateCompanyScoringUserPrompt(company: NormalizedGoogleMapsCompany): string {
-  const leadsInfo =
-    company.leads.length > 0
-      ? company.leads
-          .slice(0, 3)
-          .map(
-            (lead) =>
-              `  - ${lead.fullName || 'Unknown'}: ${lead.jobTitle || lead.headline || 'No title'}`
-          )
-          .join('\n')
-      : '  None found';
+	const leadsInfo =
+		company.leads.length > 0
+			? company.leads
+					.slice(0, 3)
+					.map(
+						(lead) =>
+							`  - ${lead.fullName || 'Unknown'}: ${lead.jobTitle || lead.headline || 'No title'}`,
+					)
+					.join('\n')
+			: '  None found'
 
-  return `Company Name: ${company.name}
+	return `Company Name: ${company.name}
 Category: ${company.category || 'Unknown'}
 Location: ${company.city || 'Unknown'}, ${company.address || ''}
 Reviews: ${company.reviewsCount || 0}
@@ -144,18 +144,18 @@ Website: ${company.website}
 Decision Makers Found:
 ${leadsInfo}
 
-Evaluate this company for Rookie AB, a recruitment agency specializing in placing early-career candidates (0-8 years experience) in white-collar roles.`;
+Evaluate this company for Rookie AB, a recruitment agency specializing in placing early-career candidates (0-8 years experience) in white-collar roles.`
 }
 
 /**
  * Zod schema for validating AI company scoring response
  */
 export const CompanyScoringResponseSchema = z.object({
-  isValid: z.boolean(),
-  score: z.number().min(0).max(100),
-  reasoning: z.string(),
-  industry_category: z.string(),
-  size_estimate: z.string(),
-});
+	isValid: z.boolean(),
+	score: z.number().min(0).max(100),
+	reasoning: z.string(),
+	industry_category: z.string(),
+	size_estimate: z.string(),
+})
 
-export type CompanyScoringResponse = z.infer<typeof CompanyScoringResponseSchema>;
+export type CompanyScoringResponse = z.infer<typeof CompanyScoringResponseSchema>
