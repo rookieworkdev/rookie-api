@@ -102,6 +102,8 @@ export interface ExtractedContact {
   // 'ai_extracted'  = parsed by AI from job description text (e.g. application email)
   sourceMethod: 'api_extracted' | 'ai_extracted';
   relatedJobAdId?: string;
+  department?: string;
+  seniority?: string;
 }
 
 // Raw job data from Apify LinkedIn scraper

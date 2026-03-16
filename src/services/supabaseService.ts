@@ -533,6 +533,8 @@ export async function upsertScrapedContact(contact: ExtractedContact): Promise<{
             source: contact.source,
             source_method: contact.sourceMethod,
             related_job_ad_id: contact.relatedJobAdId,
+            department: contact.department ?? null,
+            seniority: contact.seniority ?? null,
           },
           {
             onConflict: 'company_id,email',
@@ -663,6 +665,8 @@ export async function upsertLinkedInContact(contact: ExtractedContact): Promise<
           source: contact.source,
           source_method: contact.sourceMethod,
           related_job_ad_id: contact.relatedJobAdId,
+          department: contact.department ?? null,
+          seniority: contact.seniority ?? null,
         },
         {
           onConflict: 'company_id,linkedin_url',
@@ -816,6 +820,8 @@ export async function upsertGoogleMapsContact(
     linkedinUrl: lead.linkedinProfile || undefined,
     source: 'google_maps',
     sourceMethod: 'api_extracted',
+    department: lead.departments?.[0] || undefined,
+    seniority: lead.seniority || undefined,
   };
 
   // Prefer email-based upsert (stronger dedup key), fall back to linkedin
