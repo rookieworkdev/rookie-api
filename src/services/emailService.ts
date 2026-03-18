@@ -8,6 +8,12 @@ import { emitAlert } from './alertService.js';
 
 const resend = new Resend(config.resend.apiKey);
 
+function isEmailWhitelisted(recipient: string | undefined): boolean {
+  if (!recipient) return false;
+  if (config.emailWhitelist.length === 0) return true;
+  return config.emailWhitelist.includes(recipient.toLowerCase());
+}
+
 /**
  * Escapes HTML special characters to prevent XSS in email templates
  */
@@ -223,9 +229,15 @@ export async function sendEmailToLead(
 
     // For testing without verified domain, send to Rookie account only
     // Original lead email included in subject for tracking
+    const toAddress = 'rookiework.dev@gmail.com';
+    if (!isEmailWhitelisted(toAddress)) {
+      logger.warn('Email blocked by whitelist', { to: toAddress, leadEmail: maskEmail(leadEmail) });
+      return { id: 'blocked-by-whitelist' } as EmailResponse;
+    }
+
     const { data, error } = await resend.emails.send({
       from: config.resend.fromEmail,
-      to: 'rookiework.dev@gmail.com',
+      to: toAddress,
       subject: `Tack för din förfrågan till Rookie - Vi har kandidater! [Lead: ${leadEmail}]`,
       html: generateEmailHTML(jobAd, companyName),
     });
@@ -381,6 +393,11 @@ export async function sendAdminAlert(
       failurePoint,
     });
 
+    if (!isEmailWhitelisted(config.adminAlert.email)) {
+      logger.warn('Admin alert email blocked by whitelist', { to: config.adminAlert.email });
+      return null;
+    }
+
     const { data, error: emailError } = await resend.emails.send({
       from: config.resend.fromEmail,
       to: config.adminAlert.email,
@@ -525,6 +542,11 @@ export async function sendScraperFailureAlert(
     }
 
     logger.info('Sending scraper failure alert', { source, email: config.adminAlert.email });
+
+    if (!isEmailWhitelisted(config.adminAlert.email)) {
+      logger.warn('Scraper failure alert email blocked by whitelist', { to: config.adminAlert.email });
+      return null;
+    }
 
     const { data, error: emailError } = await resend.emails.send({
       from: config.resend.fromEmail,
@@ -778,6 +800,11 @@ export async function sendJobScraperDigestEmail(result: ScraperRunResult): Promi
       validJobs: result.stats.valid,
       discardedJobs: result.stats.discarded,
     });
+
+    if (!isEmailWhitelisted(recipient)) {
+      logger.warn('Scraper digest email blocked by whitelist', { to: recipient });
+      return null;
+    }
 
     const { data, error } = await resend.emails.send({
       from: config.resend.fromEmail,
@@ -1041,6 +1068,11 @@ export async function sendLeadScraperDigestEmail(result: LeadScraperRunResult): 
       contactsCreated: result.stats.contactsCreated,
     });
 
+    if (!isEmailWhitelisted(recipient)) {
+      logger.warn('Lead scraper digest email blocked by whitelist', { to: recipient });
+      return null;
+    }
+
     const { data, error } = await resend.emails.send({
       from: config.resend.fromEmail,
       to: recipient,
@@ -1274,6 +1306,11 @@ export async function sendHealthCheckDigestEmail(result: HealthCheckResult): Pro
       overallSeverity: result.overallSeverity,
       summary: result.summary,
     });
+
+    if (!isEmailWhitelisted(recipient)) {
+      logger.warn('Health check digest email blocked by whitelist', { to: recipient });
+      return null;
+    }
 
     const { data, error } = await resend.emails.send({
       from: config.resend.fromEmail,

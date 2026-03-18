@@ -51,6 +51,13 @@ export const config: Config = {
   // API key for all protected endpoints (admin, scrapers, etc.)
   rookieApiKey: process.env.ROOKIE_API_KEY,
 
+  // Email whitelist - comma-separated list of allowed recipient emails
+  // When set, only these addresses receive emails (dev safety guard)
+  // When empty/unset, all sends are allowed (production behavior)
+  emailWhitelist: process.env.EMAIL_WHITELIST
+    ? process.env.EMAIL_WHITELIST.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
+    : [],
+
   // Job scraper settings
   scraper: {
     enabled: process.env.SCRAPER_ENABLED !== 'false',

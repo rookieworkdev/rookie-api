@@ -174,6 +174,7 @@ export interface Config {
     apiKey: string | undefined;
   };
   rookieApiKey: string | undefined;
+  emailWhitelist: string[];
   scraper: {
     enabled: boolean;
     keywords: string;
