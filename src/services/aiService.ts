@@ -38,6 +38,13 @@ import {
   InterviewEvaluationResponseSchema,
   type InterviewEvaluationResponse,
 } from '../prompts/interviewEvaluation.prompt.js';
+import {
+  INTERVIEW_QUESTION_GENERATION_SYSTEM_PROMPT,
+  generateInterviewQuestionsUserPrompt,
+  InterviewQuestionGenerationResponseSchema,
+  type InterviewQuestionGenerationResponse,
+  type CandidateProfileForGeneration,
+} from '../prompts/interviewQuestionGeneration.prompt.js';
 import { CvParsingError } from './cvParsingService.js';
 
 // Zod schemas for AI response validation
@@ -964,6 +971,80 @@ async function scoreMatchBatchWithFallback(pairs: MatchScoringPair[]): Promise<M
   }
 
   return validated.data.results;
+}
+
+// ============================================================================
+// INTERVIEW QUESTION GENERATION (text-only via OpenRouter Gemini 2.0 Flash)
+// ============================================================================
+
+const INTERVIEW_GEN_MODEL = 'google/gemini-2.0-flash-001';
+
+/**
+ * Generate personalized interview questions from a candidate's profile.
+ * Uses Gemini 2.0 Flash (cheap, fast, good enough for structured generation).
+ */
+export async function generateInterviewQuestions(
+  questionCount: number,
+  serviceType: string,
+  profile: CandidateProfileForGeneration,
+): Promise<InterviewQuestionGenerationResponse | null> {
+  const client = openRouterClient || openai;
+  const model = openRouterClient ? INTERVIEW_GEN_MODEL : config.openai.model;
+
+  try {
+    const userPrompt = generateInterviewQuestionsUserPrompt({
+      questionCount,
+      serviceType,
+      profile,
+    });
+
+    logger.info('Generating interview questions', {
+      questionCount,
+      serviceType,
+      skillCount: profile.skills?.length ?? 0,
+    });
+
+    const response = await client.chat.completions.create({
+      model,
+      messages: [
+        { role: 'system', content: INTERVIEW_QUESTION_GENERATION_SYSTEM_PROMPT },
+        { role: 'user', content: userPrompt },
+      ],
+      temperature: 0.7, // Higher temperature for question variety
+      max_tokens: 4000,
+    });
+
+    const content = response.choices[0].message.content;
+    if (!content) {
+      logger.warn('Empty LLM response for interview question generation');
+      return null;
+    }
+
+    const cleanContent = content
+      .replace(/^```json\s*/i, '')
+      .replace(/\s*```\s*$/, '')
+      .trim();
+
+    const jsonParsed = JSON.parse(cleanContent);
+    const validated = InterviewQuestionGenerationResponseSchema.safeParse(jsonParsed);
+
+    if (!validated.success) {
+      logger.warn('Interview question generation response validation failed', {
+        errors: validated.error.errors,
+      });
+      return null;
+    }
+
+    logger.info('Interview questions generated', {
+      count: validated.data.questions.length,
+      claims: validated.data.questions.map(q => q.profileClaim),
+    });
+
+    return validated.data;
+  } catch (error) {
+    logger.error('Interview question generation error', error as Error);
+    return null;
+  }
 }
 
 // ============================================================================
