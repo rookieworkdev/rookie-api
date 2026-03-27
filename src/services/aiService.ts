@@ -1062,6 +1062,7 @@ export async function evaluateInterviewRecording(
   audioUrl: string,
   question: string,
   candidateProfile: string,
+  profileClaim: string | null = null,
 ): Promise<{ transcript: string | null; evaluation: Omit<InterviewEvaluationResponse, 'transcript'> | null }> {
   const client = openRouterClient || openai;
   const model = openRouterClient ? INTERVIEW_EVAL_PRIMARY_MODEL : config.openai.model;
@@ -1080,6 +1081,7 @@ export async function evaluateInterviewRecording(
     const userPrompt = generateInterviewEvaluationUserPrompt({
       question,
       candidateProfile,
+      profileClaim,
     });
 
     const response = await client.chat.completions.create({

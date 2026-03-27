@@ -10,6 +10,7 @@ const EvaluateRequestSchema = z.object({
   recordingUrl: z.string().url(),
   question: z.string().min(1),
   candidateProfile: z.string(),
+  profileClaim: z.string().nullable().optional(),
 });
 
 /**
@@ -28,10 +29,10 @@ router.post('/evaluate', verifyApiKey, async (req: Request, res: Response) => {
     return;
   }
 
-  const { recordingUrl, question, candidateProfile } = parseResult.data;
+  const { recordingUrl, question, candidateProfile, profileClaim } = parseResult.data;
 
   try {
-    const result = await evaluateInterviewRecording(recordingUrl, question, candidateProfile);
+    const result = await evaluateInterviewRecording(recordingUrl, question, candidateProfile, profileClaim ?? null);
 
     res.json({
       success: true,
