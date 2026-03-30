@@ -16,7 +16,7 @@ CORE PRINCIPLES:
 4. Questions should reveal depth of real experience vs surface-level claims
 5. Mix question styles: open-ended stories, specific examples, situational, and language verification
 6. Questions about language proficiency MUST be asked in that language
-7. Default interview language is Swedish unless the candidate's profile suggests otherwise
+7. The candidate has chosen a preferred interview language - use it as the primary language for all questions. Language verification questions in other languages are still allowed as brief follow-ups
 
 QUESTION DESIGN RULES:
 - DO ask: "You listed bokforing as a key skill. What types have you worked with - lopande, arsbokslut, or koncernredovisning?"
@@ -202,6 +202,11 @@ export function generateInterviewQuestionsUserPrompt(data: {
     sections.push('This is a temp staffing interview - focus on core competencies and availability. Keep questions concise.');
   }
 
+  // Interview language preference
+  const lang = profile.interviewLanguage === 'en' ? 'English' : 'Swedish';
+  sections.push(`Preferred interview language: ${lang}`);
+  sections.push(`Ask all main questions in ${lang}. You may still include 1-2 brief verification questions in other languages the candidate claims proficiency in.`);
+
   sections.push('');
   sections.push(`Generate exactly ${questionCount} questions. Return JSON only.`);
 
@@ -245,4 +250,5 @@ export interface CandidateProfileForGeneration {
     isCurrent: boolean;
   }>;
   preferredWorkTasks: string[];
+  interviewLanguage: string | null;
 }

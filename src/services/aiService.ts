@@ -1048,6 +1048,57 @@ export async function generateInterviewQuestions(
 }
 
 // ============================================================================
+// INTERVIEW QUESTION TRANSLATION (text-only via OpenRouter Gemini 2.0 Flash)
+// ============================================================================
+
+/**
+ * Translate interview questions from Swedish to English (or vice versa).
+ * Used when manual fallback questions need to match the candidate's preferred language.
+ */
+export async function translateInterviewQuestions(
+  questions: Array<{ id: string; question: string }>,
+  targetLanguage: string,
+): Promise<Array<{ id: string; question: string }> | null> {
+  const client = openRouterClient || openai;
+  const model = openRouterClient ? INTERVIEW_GEN_MODEL : config.openai.model;
+
+  try {
+    const langLabel = targetLanguage === 'en' ? 'English' : 'Swedish';
+    const prompt = `Translate the following interview questions to ${langLabel}. Keep the tone conversational and professional. Return ONLY valid JSON.
+
+Input questions:
+${JSON.stringify(questions, null, 2)}
+
+Return format:
+{ "questions": [{ "id": "original-id", "question": "translated text" }] }`;
+
+    const response = await client.chat.completions.create({
+      model,
+      messages: [
+        { role: 'system', content: `You are a professional translator specializing in recruitment/HR content. Translate accurately while keeping the conversational interview tone. Return ONLY valid JSON, no markdown.` },
+        { role: 'user', content: prompt },
+      ],
+      temperature: 0.3,
+      max_tokens: 4000,
+    });
+
+    const content = response.choices[0].message.content;
+    if (!content) return null;
+
+    const cleanContent = content
+      .replace(/^```json\s*/i, '')
+      .replace(/\s*```\s*$/, '')
+      .trim();
+
+    const parsed = JSON.parse(cleanContent);
+    return parsed.questions || null;
+  } catch (error) {
+    logger.error('Interview question translation error', error as Error);
+    return null;
+  }
+}
+
+// ============================================================================
 // INTERVIEW EVALUATION (multimodal audio evaluation via OpenRouter Gemini)
 // ============================================================================
 

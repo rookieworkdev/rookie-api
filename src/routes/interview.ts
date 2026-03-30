@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { verifyApiKey } from '../middleware/scraperAuth.js';
-import { evaluateInterviewRecording, generateInterviewQuestions } from '../services/aiService.js';
+import { evaluateInterviewRecording, generateInterviewQuestions, translateInterviewQuestions } from '../services/aiService.js';
 import { logger } from '../utils/logger.js';
 
 const router: Router = Router();
@@ -86,6 +86,7 @@ const GenerateQuestionsRequestSchema = z.object({
       isCurrent: z.boolean(),
     })),
     preferredWorkTasks: z.array(z.string()),
+    interviewLanguage: z.string().nullable().optional(),
   }),
 });
 
@@ -128,6 +129,57 @@ router.post('/generate-questions', verifyApiKey, async (req: Request, res: Respo
     res.status(500).json({
       success: false,
       error: 'Interview question generation failed',
+    });
+  }
+});
+
+const TranslateQuestionsRequestSchema = z.object({
+  questions: z.array(z.object({
+    id: z.string(),
+    question: z.string(),
+  })),
+  targetLanguage: z.string().min(1),
+});
+
+/**
+ * POST /api/interview/translate-questions
+ * Translate interview questions to a target language.
+ */
+router.post('/translate-questions', verifyApiKey, async (req: Request, res: Response) => {
+  const startTime = Date.now();
+  const parseResult = TranslateQuestionsRequestSchema.safeParse(req.body);
+
+  if (!parseResult.success) {
+    res.status(400).json({
+      success: false,
+      error: parseResult.error.errors.map(e => e.message).join(', '),
+    });
+    return;
+  }
+
+  const { questions, targetLanguage } = parseResult.data;
+
+  try {
+    const result = await translateInterviewQuestions(questions, targetLanguage);
+
+    if (!result) {
+      res.status(500).json({
+        success: false,
+        error: 'Translation failed',
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      questions: result,
+      processingTime: Date.now() - startTime,
+    });
+  } catch (error) {
+    logger.error('Interview question translation endpoint error', error as Error);
+    res.status(500).json({
+      success: false,
+      error: 'Translation failed',
     });
   }
 });
