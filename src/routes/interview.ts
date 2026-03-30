@@ -86,7 +86,7 @@ const GenerateQuestionsRequestSchema = z.object({
       isCurrent: z.boolean(),
     })),
     preferredWorkTasks: z.array(z.string()),
-    interviewLanguage: z.string().nullable().optional(),
+    interviewLanguage: z.string().nullable().default(null),
   }),
 });
 
