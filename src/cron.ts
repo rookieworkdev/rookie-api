@@ -55,49 +55,58 @@ async function callEndpoint(name: string, method: string, path: string, baseUrl 
  * To add a new scraper: add one schedule() call below.
  */
 export function startCronJobs(): void {
-  // Job scrapers — staggered daily to avoid overlapping API calls
-  cron.schedule('0 6 * * *', () => callEndpoint('Indeed scraper', 'POST', '/api/scraping/jobs/indeed'), {
-    timezone: 'UTC',
-  });
+  const scraperEnabled = config.scraper?.enabled ?? true;
+  const scheduledJobs: string[] = [];
 
-  cron.schedule('0 7 * * *', () => callEndpoint('LinkedIn scraper', 'POST', '/api/scraping/jobs/linkedin'), {
-    timezone: 'UTC',
-  });
+  if (scraperEnabled) {
+    // Job scrapers — staggered daily to avoid overlapping API calls
+    cron.schedule('0 6 * * *', () => callEndpoint('Indeed scraper', 'POST', '/api/scraping/jobs/indeed'), {
+      timezone: 'UTC',
+    });
 
-  cron.schedule('0 8 * * *', () => callEndpoint('AF scraper', 'POST', '/api/scraping/jobs/af'), {
-    timezone: 'UTC',
-  });
+    cron.schedule('0 7 * * *', () => callEndpoint('LinkedIn scraper', 'POST', '/api/scraping/jobs/linkedin'), {
+      timezone: 'UTC',
+    });
 
-  // Lead scrapers — weekly during development, reduce frequency once good coverage achieved
-  cron.schedule('0 10 * * 0', () => callEndpoint('Google Maps scraper', 'POST', '/api/scraping/leads/google-maps'), {
-    timezone: 'UTC',
-  });
+    cron.schedule('0 8 * * *', () => callEndpoint('AF scraper', 'POST', '/api/scraping/jobs/af'), {
+      timezone: 'UTC',
+    });
 
-  // Maintenance
-  cron.schedule('0 0 * * 0', () => callEndpoint('Job cleanup', 'POST', '/api/scraping/jobs/cleanup'), {
-    timezone: 'UTC',
-  });
+    // Lead scrapers — weekly during development, reduce frequency once good coverage achieved
+    cron.schedule('0 10 * * 0', () => callEndpoint('Google Maps scraper', 'POST', '/api/scraping/leads/google-maps'), {
+      timezone: 'UTC',
+    });
 
-  // Health digest — weekly Monday morning
+    // Maintenance
+    cron.schedule('0 0 * * 0', () => callEndpoint('Job cleanup', 'POST', '/api/scraping/jobs/cleanup'), {
+      timezone: 'UTC',
+    });
+
+    scheduledJobs.push(
+      'Indeed (daily 06:00 UTC)',
+      'LinkedIn (daily 07:00 UTC)',
+      'AF (daily 08:00 UTC)',
+      'Google Maps (Sunday 10:00 UTC)',
+      'Cleanup (Sunday 00:00 UTC)',
+    );
+  } else {
+    logger.warn('[cron] SCRAPER_ENABLED=false — all scraper and cleanup cron jobs skipped');
+  }
+
+  // Health digest — weekly Monday morning (always runs, read-only)
   cron.schedule('0 8 * * 1', () => callEndpoint('Health digest', 'POST', '/api/admin/health-check/send-digest'), {
     timezone: 'UTC',
   });
+  scheduledJobs.push('Health digest (Monday 08:00 UTC)');
 
   // Match notifications — every 30 min, calls platform (Next.js) endpoint
   // Jobs must be 20+ min old to avoid immediate sends after scraping
   cron.schedule('*/30 * * * *', () => callEndpoint('Match notifications', 'GET', '/api/cron/match-notifications', PLATFORM_URL), {
     timezone: 'UTC',
   });
+  scheduledJobs.push('Match notifications (every 30 min -> platform)');
 
-  logger.info('[cron] Scheduled 7 cron jobs', {
-    jobs: [
-      'Indeed (daily 06:00 UTC)',
-      'LinkedIn (daily 07:00 UTC)',
-      'AF (daily 08:00 UTC)',
-      'Google Maps (Sunday 10:00 UTC)',
-      'Cleanup (Sunday 00:00 UTC)',
-      'Health digest (Monday 08:00 UTC)',
-      'Match notifications (every 30 min → platform)',
-    ],
+  logger.info(`[cron] Scheduled ${scheduledJobs.length} cron jobs (scrapers ${scraperEnabled ? 'ON' : 'OFF'})`, {
+    jobs: scheduledJobs,
   });
 }
