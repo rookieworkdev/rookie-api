@@ -747,6 +747,12 @@ async function evaluateCompanyWithFallback(company: NormalizedGoogleMapsCompany)
 const CV_PARSING_PRIMARY_MODEL = 'google/gemini-2.0-flash-001';
 const CV_PARSING_FALLBACK_MODEL = 'openai/gpt-4o-mini';
 
+// Fix invalid Unicode escape sequences (e.g. \uXXXX where XXXX aren't hex digits)
+// that LLMs sometimes produce when processing CV text with special characters.
+function sanitizeJsonString(str: string): string {
+  return str.replace(/\\u(?![0-9a-fA-F]{4})/g, '\\\\u');
+}
+
 /**
  * Parses CV text using AI to extract structured candidate data.
  * Uses Gemini 2.0 Flash via OpenRouter, with GPT-4o-mini fallback.
@@ -776,10 +782,12 @@ export async function parseCv(cvText: string): Promise<CvParsedData> {
       throw new Error('No content in AI response');
     }
 
-    const cleanContent = content
-      .replace(/^```json\s*/i, '')
-      .replace(/\s*```\s*$/, '')
-      .trim();
+    const cleanContent = sanitizeJsonString(
+      content
+        .replace(/^```json\s*/i, '')
+        .replace(/\s*```\s*$/, '')
+        .trim()
+    );
 
     const jsonParsed = JSON.parse(cleanContent);
     const validated = CvParsedDataSchema.safeParse(jsonParsed);
@@ -842,10 +850,12 @@ async function parseCvWithFallback(cvText: string): Promise<CvParsedData> {
     throw new Error('No content in fallback AI response');
   }
 
-  const cleanContent = content
-    .replace(/^```json\s*/i, '')
-    .replace(/\s*```\s*$/, '')
-    .trim();
+  const cleanContent = sanitizeJsonString(
+    content
+      .replace(/^```json\s*/i, '')
+      .replace(/\s*```\s*$/, '')
+      .trim()
+  );
 
   const jsonParsed = JSON.parse(cleanContent);
   const validated = CvParsedDataSchema.safeParse(jsonParsed);
