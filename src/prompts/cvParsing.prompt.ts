@@ -122,7 +122,7 @@ export const CvParsedDataSchema = z.object({
   }),
   education: z.array(
     z.object({
-      school: z.string(),
+      school: z.string().nullable().default(null),
       degree: z.string().nullable(),
       field_of_study: z.string().nullable(),
       start_date: z.string().nullable(),
@@ -132,8 +132,8 @@ export const CvParsedDataSchema = z.object({
   ),
   experience: z.array(
     z.object({
-      company_name: z.string(),
-      title: z.string(),
+      company_name: z.string().nullable().default(null),
+      title: z.string().nullable().default(null),
       description: z.string().nullable(),
       start_date: z.string().nullable(),
       end_date: z.string().nullable(),
@@ -142,20 +142,20 @@ export const CvParsedDataSchema = z.object({
   ),
   skills: z.array(
     z.object({
-      skill_name: z.string(),
+      skill_name: z.string().nullable().default(null),
       level: z.enum(['beginner', 'intermediate', 'advanced']).nullable(),
       years: z.number().nullable(),
     }),
   ),
   languages: z.array(
     z.object({
-      language: z.string(),
+      language: z.string().nullable().default(null),
       proficiency: z.enum(['native', 'fluent', 'advanced', 'intermediate', 'beginner']).nullable(),
     }),
   ),
   references: z.array(
     z.object({
-      name: z.string(),
+      name: z.string().nullable().default(null),
       email: z.string().nullable(),
       phone: z.string().nullable(),
       company: z.string().nullable(),
@@ -164,7 +164,7 @@ export const CvParsedDataSchema = z.object({
   ),
   certifications: z.array(
     z.object({
-      name: z.string(),
+      name: z.string().nullable().default(null),
       issuer: z.string().nullable(),
       issue_date: z.string().nullable(),
       expiry_date: z.string().nullable(),
