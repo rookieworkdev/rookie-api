@@ -1,10 +1,13 @@
 import { Resend } from 'resend';
+import { createClient } from '@supabase/supabase-js';
 import { config } from '../config/env.js';
 import { logger, getErrorMessage, maskEmail } from '../utils/logger.js';
 import type { FormData, JobAdData, EmailResponse } from '../types/index.js';
 import type { ScraperRunResult, ProcessedJob, LeadScraperRunResult, ProcessedCompany } from '../types/scraper.types.js';
 import type { HealthCheckResult, HealthCheckItem, HealthCheckSeverity } from '../types/healthCheck.types.js';
 import { emitAlert } from './alertService.js';
+
+const supabase = createClient(config.supabase.url, config.supabase.key!);
 
 const resend = new Resend(config.resend.apiKey);
 
@@ -383,24 +386,20 @@ export async function sendAdminAlert(
 ): Promise<EmailResponse | null> {
   try {
     // Check if admin alerts are configured
-    if (!config.adminAlert?.email) {
-      logger.warn('Admin alert email not configured, skipping alert');
+    const recipients = config.adminAlert?.emails?.filter(e => isEmailWhitelisted(e)) || [];
+    if (recipients.length === 0) {
+      logger.warn('No admin alert recipients configured or whitelisted, skipping alert');
       return null;
     }
 
     logger.info('Sending admin alert email', {
-      email: config.adminAlert.email,
+      recipients: recipients.length,
       failurePoint,
     });
 
-    if (!isEmailWhitelisted(config.adminAlert.email)) {
-      logger.warn('Admin alert email blocked by whitelist', { to: config.adminAlert.email });
-      return null;
-    }
-
     const { data, error: emailError } = await resend.emails.send({
       from: config.resend.fromEmail,
-      to: config.adminAlert.email,
+      to: recipients,
       subject: `ALERT: Form Submission Failed - ${escapeHtml(formData.company_name || 'Unknown Company')}`,
       html: generateAdminAlertHTML(formData, error, failurePoint),
     });
@@ -536,21 +535,17 @@ export async function sendScraperFailureAlert(
   context?: { runId?: string; step?: string; processingTime?: number }
 ): Promise<EmailResponse | null> {
   try {
-    if (!config.adminAlert?.email) {
-      logger.warn('Admin alert email not configured, skipping scraper failure alert');
+    const recipients = config.adminAlert?.emails?.filter(e => isEmailWhitelisted(e)) || [];
+    if (recipients.length === 0) {
+      logger.warn('No admin alert recipients configured or whitelisted, skipping scraper failure alert');
       return null;
     }
 
-    logger.info('Sending scraper failure alert', { source, email: config.adminAlert.email });
-
-    if (!isEmailWhitelisted(config.adminAlert.email)) {
-      logger.warn('Scraper failure alert email blocked by whitelist', { to: config.adminAlert.email });
-      return null;
-    }
+    logger.info('Sending scraper failure alert', { source, recipients: recipients.length });
 
     const { data, error: emailError } = await resend.emails.send({
       from: config.resend.fromEmail,
-      to: config.adminAlert.email,
+      to: recipients,
       subject: `Scraper Failed: ${source} | ${new Date().toLocaleDateString('sv-SE')}`,
       html: generateScraperFailureAlertHTML(source, error, context),
     });
@@ -792,23 +787,22 @@ function generateScraperDigestHTML(result: ScraperRunResult): string {
  */
 export async function sendJobScraperDigestEmail(result: ScraperRunResult): Promise<EmailResponse | null> {
   try {
-    const recipient = config.adminAlert?.email || 'rookiework.dev@gmail.com';
+    const recipients = config.adminAlert?.emails?.filter(e => isEmailWhitelisted(e)) || [];
+    if (recipients.length === 0) {
+      logger.warn('No admin alert recipients configured or whitelisted, skipping scraper digest');
+      return null;
+    }
 
     logger.info('Sending job scraper digest email', {
       source: result.source,
-      recipient,
+      recipients: recipients.length,
       validJobs: result.stats.valid,
       discardedJobs: result.stats.discarded,
     });
 
-    if (!isEmailWhitelisted(recipient)) {
-      logger.warn('Scraper digest email blocked by whitelist', { to: recipient });
-      return null;
-    }
-
     const { data, error } = await resend.emails.send({
       from: config.resend.fromEmail,
-      to: recipient,
+      to: recipients,
       subject: `Job Scraper: ${result.stats.valid} new ${result.source} jobs (${result.stats.afterDedup} processed)`,
       html: generateScraperDigestHTML(result),
     });
@@ -1058,24 +1052,24 @@ function generateLeadScraperDigestHTML(result: LeadScraperRunResult): string {
  */
 export async function sendLeadScraperDigestEmail(result: LeadScraperRunResult): Promise<EmailResponse | null> {
   try {
-    const recipient = config.adminAlert?.email || 'rookiework.dev@gmail.com';
+    const recipients = config.adminAlert?.emails?.filter(e => isEmailWhitelisted(e)) || [];
     const today = new Date().toLocaleDateString('sv-SE');
+
+    if (recipients.length === 0) {
+      logger.warn('No admin alert recipients configured or whitelisted, skipping lead scraper digest');
+      return null;
+    }
 
     logger.info('Sending lead scraper digest email', {
       source: result.source,
-      recipient,
+      recipients: recipients.length,
       validCompanies: result.stats.valid,
       contactsCreated: result.stats.contactsCreated,
     });
 
-    if (!isEmailWhitelisted(recipient)) {
-      logger.warn('Lead scraper digest email blocked by whitelist', { to: recipient });
-      return null;
-    }
-
     const { data, error } = await resend.emails.send({
       from: config.resend.fromEmail,
-      to: recipient,
+      to: recipients,
       subject: `Google Maps Digest: ${result.stats.valid} New Prospects, ${result.stats.contactsCreated} Contacts | ${today}`,
       html: generateLeadScraperDigestHTML(result),
     });
@@ -1292,8 +1286,13 @@ function generateHealthCheckDigestHTML(result: HealthCheckResult): string {
  */
 export async function sendHealthCheckDigestEmail(result: HealthCheckResult): Promise<EmailResponse | null> {
   try {
-    const recipient = config.adminAlert?.email || 'rookiework.dev@gmail.com';
+    const recipients = config.adminAlert?.emails?.filter(e => isEmailWhitelisted(e)) || [];
     const today = new Date().toLocaleDateString('sv-SE');
+
+    if (recipients.length === 0) {
+      logger.warn('No admin alert recipients configured or whitelisted, skipping health check digest');
+      return null;
+    }
 
     const issueCount = result.summary.warning + result.summary.critical;
     const subject =
@@ -1302,19 +1301,14 @@ export async function sendHealthCheckDigestEmail(result: HealthCheckResult): Pro
         : `DB Health: ${issueCount} Issue${issueCount > 1 ? 's' : ''} | ${result.summary.ok}/${result.summary.total} OK | ${today}`;
 
     logger.info('Sending health check digest email', {
-      recipient,
+      recipients: recipients.length,
       overallSeverity: result.overallSeverity,
       summary: result.summary,
     });
 
-    if (!isEmailWhitelisted(recipient)) {
-      logger.warn('Health check digest email blocked by whitelist', { to: recipient });
-      return null;
-    }
-
     const { data, error } = await resend.emails.send({
       from: config.resend.fromEmail,
-      to: recipient,
+      to: recipients,
       subject,
       html: generateHealthCheckDigestHTML(result),
     });
@@ -1399,30 +1393,46 @@ export async function sendCriticalErrorAlert(
   error: unknown,
   context: CriticalErrorContext
 ): Promise<void> {
+  const errorMessage = getErrorMessage(error);
+  const stack = context.stack || (error instanceof Error ? error.stack : undefined);
+  let emailSent = false;
+  const recipients = config.adminAlert?.emails?.filter(e => isEmailWhitelisted(e)) || [];
+
+  // Send email alert
   try {
-    if (!config.adminAlert?.email) {
-      logger.warn('Admin alert email not configured, skipping critical error alert');
-      return;
-    }
+    if (recipients.length > 0) {
+      const { error: emailError } = await resend.emails.send({
+        from: config.resend.fromEmail,
+        to: recipients,
+        subject: `CRITICAL: ${source} failed | ${new Date().toLocaleString('sv-SE', { timeZone: 'Europe/Stockholm' })}`,
+        html: generateCriticalErrorAlertHTML(source, error, context),
+      });
 
-    if (!isEmailWhitelisted(config.adminAlert.email)) {
-      logger.warn('Critical error alert blocked by whitelist', { to: config.adminAlert.email });
-      return;
-    }
-
-    const { error: emailError } = await resend.emails.send({
-      from: config.resend.fromEmail,
-      to: config.adminAlert.email,
-      subject: `CRITICAL: ${source} failed | ${new Date().toLocaleString('sv-SE', { timeZone: 'Europe/Stockholm' })}`,
-      html: generateCriticalErrorAlertHTML(source, error, context),
-    });
-
-    if (emailError) {
-      logger.error('Failed to send critical error alert', emailError);
-    } else {
-      logger.info('Critical error alert sent', { source });
+      if (emailError) {
+        logger.error('Failed to send critical error alert', emailError);
+      } else {
+        emailSent = true;
+        logger.info('Critical error alert sent', { source, recipients: recipients.length });
+      }
     }
   } catch (err) {
     logger.error('Error sending critical error alert', err);
+  }
+
+  // Write to system_error_logs table
+  try {
+    await supabase.from('system_error_logs').insert({
+      source: 'backend',
+      severity: 'critical',
+      endpoint: context.endpoint,
+      error_message: errorMessage,
+      stack_trace: stack?.slice(0, 5000) || null,
+      input_summary: context.input ? JSON.stringify(context.input).slice(0, 1000) : null,
+      processing_time_ms: context.processingTime || null,
+      email_sent: emailSent,
+      email_recipient: recipients.join(', ') || null,
+    });
+  } catch (dbErr) {
+    logger.error('Failed to write error log to database', dbErr);
   }
 }

@@ -165,7 +165,7 @@ export interface Config {
     fromEmail: string;
   };
   adminAlert: {
-    email: string | undefined;
+    emails: string[];
   };
   webhook: {
     secret: string | undefined;

@@ -35,7 +35,7 @@ export const config: Config = {
 
   // Admin alerts
   adminAlert: {
-    email: process.env.ADMIN_ALERT_EMAIL,
+    emails: (process.env.ADMIN_ALERT_EMAILS || '').split(',').map(e => e.trim()).filter(Boolean),
   },
 
   // Webhook security
