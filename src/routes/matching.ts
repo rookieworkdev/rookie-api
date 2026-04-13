@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { logger, getErrorMessage } from '../utils/logger.js';
 import { verifyApiKey } from '../middleware/scraperAuth.js';
 import { scoreMatchBatch } from '../services/aiService.js';
+import { sendCriticalErrorAlert } from '../services/emailService.js';
 
 const router: Router = Router();
 
@@ -58,6 +59,13 @@ router.post('/score-batch', verifyApiKey, async (req: Request, res: Response) =>
     const processingTime = Date.now() - startTime;
 
     logger.error('Match score-batch request failed', error, { processingTime });
+
+    sendCriticalErrorAlert('Match Scoring', error, {
+      endpoint: '/api/matching/score-batch',
+      input: { pairCount: req.body?.pairs?.length },
+      processingTime,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
 
     return res.status(500).json({
       success: false,

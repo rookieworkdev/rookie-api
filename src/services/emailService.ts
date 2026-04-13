@@ -1332,3 +1332,97 @@ export async function sendHealthCheckDigestEmail(result: HealthCheckResult): Pro
     return null;
   }
 }
+
+// ============================================================================
+// CRITICAL ERROR ALERT (generic, for any user-facing failure)
+// ============================================================================
+
+interface CriticalErrorContext {
+  endpoint: string;
+  method?: string;
+  input?: Record<string, unknown>;
+  processingTime?: number;
+  stack?: string;
+}
+
+function generateCriticalErrorAlertHTML(
+  source: string,
+  error: unknown,
+  context: CriticalErrorContext
+): string {
+  const errorMessage = getErrorMessage(error);
+  const stack = context.stack || (error instanceof Error ? error.stack : undefined);
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: -apple-system, sans-serif; background: #f3f4f6; padding: 20px; }
+    .container { max-width: 600px; margin: 0 auto; background: #fff; border-radius: 8px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .alert-header { background: #fee2e2; color: #991b1b; padding: 16px; border-radius: 6px; margin-bottom: 20px; }
+    .alert-header h1 { margin: 0; font-size: 20px; }
+    .error-box { background: #fef2f2; border-left: 4px solid #dc2626; padding: 12px; margin: 12px 0; border-radius: 4px; font-family: monospace; font-size: 13px; white-space: pre-wrap; word-break: break-all; }
+    .detail { background: #f9fafb; padding: 8px 12px; margin: 4px 0; border-radius: 4px; }
+    .detail strong { color: #4b5563; }
+    .stack { background: #1f2937; color: #f9fafb; padding: 12px; border-radius: 4px; font-family: monospace; font-size: 11px; white-space: pre-wrap; word-break: break-all; margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="alert-header">
+      <h1>Critical Error: ${escapeHtml(source)}</h1>
+    </div>
+
+    <div class="error-box">${escapeHtml(errorMessage)}</div>
+
+    <div class="detail"><strong>Endpoint:</strong> ${escapeHtml(context.endpoint)}</div>
+    <div class="detail"><strong>Timestamp:</strong> ${new Date().toLocaleString('sv-SE', { timeZone: 'Europe/Stockholm' })}</div>
+    ${context.processingTime != null ? `<div class="detail"><strong>Processing time:</strong> ${(context.processingTime / 1000).toFixed(1)}s</div>` : ''}
+    ${context.input ? `<div class="detail"><strong>Input:</strong> <code>${escapeHtml(JSON.stringify(context.input, null, 2).slice(0, 500))}</code></div>` : ''}
+
+    ${stack ? `<div class="stack">${escapeHtml(stack)}</div>` : ''}
+
+    <p style="margin-top: 20px; font-size: 12px; color: #6b7280;">
+      <strong>Action required:</strong> A user-facing feature failed. Check Railway logs for full context and fix the issue.
+    </p>
+  </div>
+</body>
+</html>`;
+}
+
+/**
+ * Sends a critical error alert email for user-facing failures.
+ * Fire-and-forget - never throws.
+ */
+export async function sendCriticalErrorAlert(
+  source: string,
+  error: unknown,
+  context: CriticalErrorContext
+): Promise<void> {
+  try {
+    if (!config.adminAlert?.email) {
+      logger.warn('Admin alert email not configured, skipping critical error alert');
+      return;
+    }
+
+    if (!isEmailWhitelisted(config.adminAlert.email)) {
+      logger.warn('Critical error alert blocked by whitelist', { to: config.adminAlert.email });
+      return;
+    }
+
+    const { error: emailError } = await resend.emails.send({
+      from: config.resend.fromEmail,
+      to: config.adminAlert.email,
+      subject: `CRITICAL: ${source} failed | ${new Date().toLocaleString('sv-SE', { timeZone: 'Europe/Stockholm' })}`,
+      html: generateCriticalErrorAlertHTML(source, error, context),
+    });
+
+    if (emailError) {
+      logger.error('Failed to send critical error alert', emailError);
+    } else {
+      logger.info('Critical error alert sent', { source });
+    }
+  } catch (err) {
+    logger.error('Error sending critical error alert', err);
+  }
+}

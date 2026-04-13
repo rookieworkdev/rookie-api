@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { verifyApiKey } from '../middleware/scraperAuth.js';
 import { evaluateInterviewRecording, generateInterviewQuestions, translateInterviewQuestions } from '../services/aiService.js';
 import { logger } from '../utils/logger.js';
+import { sendCriticalErrorAlert } from '../services/emailService.js';
 
 const router: Router = Router();
 
@@ -42,6 +43,12 @@ router.post('/evaluate', verifyApiKey, async (req: Request, res: Response) => {
     });
   } catch (error) {
     logger.error('Interview evaluation endpoint error', error as Error);
+    sendCriticalErrorAlert('Interview Evaluation', error, {
+      endpoint: '/api/interview/evaluate',
+      input: { question: question.slice(0, 100) },
+      processingTime: Date.now() - startTime,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     res.status(500).json({
       success: false,
       error: 'Interview evaluation failed',
@@ -126,6 +133,12 @@ router.post('/generate-questions', verifyApiKey, async (req: Request, res: Respo
     });
   } catch (error) {
     logger.error('Interview question generation endpoint error', error as Error);
+    sendCriticalErrorAlert('Interview Question Generation', error, {
+      endpoint: '/api/interview/generate-questions',
+      input: { serviceType, questionCount },
+      processingTime: Date.now() - startTime,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     res.status(500).json({
       success: false,
       error: 'Interview question generation failed',
@@ -177,6 +190,12 @@ router.post('/translate-questions', verifyApiKey, async (req: Request, res: Resp
     });
   } catch (error) {
     logger.error('Interview question translation endpoint error', error as Error);
+    sendCriticalErrorAlert('Interview Translation', error, {
+      endpoint: '/api/interview/translate-questions',
+      input: { targetLanguage, questionCount: questions.length },
+      processingTime: Date.now() - startTime,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     res.status(500).json({
       success: false,
       error: 'Translation failed',

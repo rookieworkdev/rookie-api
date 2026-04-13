@@ -4,6 +4,7 @@ import { logger, getErrorMessage } from '../utils/logger.js';
 import { verifyApiKey } from '../middleware/scraperAuth.js';
 import { extractTextFromPdf, CvParsingError } from '../services/cvParsingService.js';
 import { parseCv } from '../services/aiService.js';
+import { sendCriticalErrorAlert } from '../services/emailService.js';
 
 const router: Router = Router();
 
@@ -207,6 +208,13 @@ router.post('/parse', verifyApiKey, async (req: Request, res: Response) => {
         processingTime,
       });
 
+      sendCriticalErrorAlert('CV Parsing', error, {
+        endpoint: '/api/cv/parse',
+        input: { fileUrl: req.body?.fileUrl?.slice(0, 100) },
+        processingTime,
+        stack: error.stack,
+      });
+
       return res.status(422).json({
         success: false,
         error: error.message,
@@ -216,6 +224,13 @@ router.post('/parse', verifyApiKey, async (req: Request, res: Response) => {
     }
 
     logger.error('CV parse request failed', error, { processingTime });
+
+    sendCriticalErrorAlert('CV Parsing', error, {
+      endpoint: '/api/cv/parse',
+      input: { fileUrl: req.body?.fileUrl?.slice(0, 100) },
+      processingTime,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
 
     return res.status(500).json({
       success: false,
