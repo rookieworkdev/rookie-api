@@ -384,6 +384,9 @@ export async function sendAdminAlert(
   error: unknown,
   failurePoint: string = 'webhook_processing'
 ): Promise<EmailResponse | null> {
+  let emailSent = false;
+  const errorMessage = getErrorMessage(error);
+
   try {
     // Check if admin alerts are configured
     const recipients = config.adminAlert?.emails?.filter(e => isEmailWhitelisted(e)) || [];
@@ -414,15 +417,28 @@ export async function sendAdminAlert(
         message: String(emailError),
         metadata: { failurePoint },
       });
-      // Don't throw - we don't want alert failures to break the flow
-      return null;
+    } else {
+      emailSent = true;
+      logger.info('Admin alert email sent successfully', { emailId: data?.id });
     }
 
-    logger.info('Admin alert email sent successfully', {
-      emailId: data?.id,
-    });
+    // Write to system_error_logs
+    try {
+      await supabase.from('system_error_logs').insert({
+        source: 'backend',
+        severity: 'critical',
+        endpoint: `webhook/${failurePoint}`,
+        error_message: errorMessage,
+        stack_trace: (error instanceof Error ? error.stack : undefined)?.slice(0, 5000) || null,
+        input_summary: JSON.stringify({ company: formData.company_name, email: formData.email }).slice(0, 1000),
+        email_sent: emailSent,
+        email_recipient: recipients.join(', ') || null,
+      });
+    } catch (dbErr) {
+      logger.error('Failed to write form alert error log to database', dbErr);
+    }
 
-    return data as EmailResponse;
+    return emailSent ? (data as EmailResponse) : null;
   } catch (err) {
     logger.error('Error sending admin alert email', err);
     emitAlert({
@@ -433,7 +449,22 @@ export async function sendAdminAlert(
       message: getErrorMessage(err),
       metadata: { failurePoint },
     });
-    // Don't throw - we don't want alert failures to break the flow
+
+    // Still write to DB even if email failed
+    try {
+      await supabase.from('system_error_logs').insert({
+        source: 'backend',
+        severity: 'critical',
+        endpoint: `webhook/${failurePoint}`,
+        error_message: errorMessage,
+        stack_trace: (error instanceof Error ? error.stack : undefined)?.slice(0, 5000) || null,
+        email_sent: false,
+        email_recipient: null,
+      });
+    } catch (dbErr) {
+      logger.error('Failed to write form alert error log to database', dbErr);
+    }
+
     return null;
   }
 }
@@ -534,6 +565,7 @@ export async function sendScraperFailureAlert(
   error: unknown,
   context?: { runId?: string; step?: string; processingTime?: number }
 ): Promise<EmailResponse | null> {
+  let emailSent = false;
   try {
     const recipients = config.adminAlert?.emails?.filter(e => isEmailWhitelisted(e)) || [];
     if (recipients.length === 0) {
@@ -564,6 +596,24 @@ export async function sendScraperFailureAlert(
     }
 
     logger.info('Scraper failure alert sent', { emailId: data?.id });
+    emailSent = true;
+
+    // Write to system_error_logs
+    try {
+      await supabase.from('system_error_logs').insert({
+        source: 'backend',
+        severity: 'critical',
+        endpoint: `scraper/${source}`,
+        error_message: getErrorMessage(error),
+        stack_trace: (error instanceof Error ? error.stack : undefined)?.slice(0, 5000) || null,
+        input_summary: context ? JSON.stringify(context).slice(0, 1000) : null,
+        processing_time_ms: context?.processingTime || null,
+        email_sent: emailSent,
+        email_recipient: recipients.join(', ') || null,
+      });
+    } catch (dbErr) {
+      logger.error('Failed to write scraper error log to database', dbErr);
+    }
 
     return data as EmailResponse;
   } catch (err) {
@@ -576,6 +626,24 @@ export async function sendScraperFailureAlert(
       message: getErrorMessage(err),
       metadata: { scraperSource: source },
     });
+
+    // Still write to DB even if email failed
+    try {
+      await supabase.from('system_error_logs').insert({
+        source: 'backend',
+        severity: 'critical',
+        endpoint: `scraper/${source}`,
+        error_message: getErrorMessage(error),
+        stack_trace: (error instanceof Error ? error.stack : undefined)?.slice(0, 5000) || null,
+        input_summary: context ? JSON.stringify(context).slice(0, 1000) : null,
+        processing_time_ms: context?.processingTime || null,
+        email_sent: false,
+        email_recipient: null,
+      });
+    } catch (dbErr) {
+      logger.error('Failed to write scraper error log to database', dbErr);
+    }
+
     return null;
   }
 }
