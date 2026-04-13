@@ -127,7 +127,7 @@ export const CvParsedDataSchema = z.object({
       field_of_study: z.string().nullable(),
       start_date: z.string().nullable(),
       end_date: z.string().nullable(),
-      is_current: z.boolean(),
+      is_current: z.boolean().default(false),
     }),
   ),
   experience: z.array(
@@ -137,7 +137,7 @@ export const CvParsedDataSchema = z.object({
       description: z.string().nullable(),
       start_date: z.string().nullable(),
       end_date: z.string().nullable(),
-      is_current: z.boolean(),
+      is_current: z.boolean().default(false),
     }),
   ),
   skills: z.array(
