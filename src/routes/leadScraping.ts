@@ -111,6 +111,12 @@ router.post('/google-maps', async (req: Request, res: Response) => {
         error: 'Scraper is disabled',
       });
     }
+    if (!config.scraper.googleMapsEnabled) {
+      return res.status(503).json({
+        success: false,
+        error: 'Google Maps scraper is disabled (GOOGLEMAPS_ENABLED=false)',
+      });
+    }
 
     // Parse and validate request body
     const parseResult = LeadScraperRunRequestSchema.safeParse(req.body);
