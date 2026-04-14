@@ -59,8 +59,14 @@ export const config: Config = {
     : [],
 
   // Job scraper settings
+  // Per-scraper flags default to true; each scraper only runs when
+  // BOTH the global `enabled` and its own per-scraper flag are true.
   scraper: {
     enabled: process.env.SCRAPER_ENABLED !== 'false',
+    indeedEnabled: process.env.INDEED_ENABLED !== 'false',
+    linkedinEnabled: process.env.LINKEDIN_ENABLED !== 'false',
+    afEnabled: process.env.AF_ENABLED !== 'false',
+    googleMapsEnabled: process.env.GOOGLEMAPS_ENABLED !== 'false',
     keywords: process.env.SCRAPER_KEYWORDS || '',
     exclusionKeywords: process.env.SCRAPER_EXCLUSION_KEYWORDS?.split(',').map((k) => k.trim()) || [],
     country: process.env.SCRAPER_COUNTRY || 'SE',

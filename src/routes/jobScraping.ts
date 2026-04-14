@@ -94,6 +94,12 @@ router.post('/indeed', async (req: Request, res: Response) => {
         error: 'Scraper is disabled',
       });
     }
+    if (!config.scraper.indeedEnabled) {
+      return res.status(503).json({
+        success: false,
+        error: 'Indeed scraper is disabled (INDEED_ENABLED=false)',
+      });
+    }
 
     // Parse and validate request body
     const parseResult = ScraperRunRequestSchema.safeParse(req.body);
@@ -226,6 +232,12 @@ router.post('/linkedin', async (req: Request, res: Response) => {
       return res.status(503).json({
         success: false,
         error: 'Scraper is disabled',
+      });
+    }
+    if (!config.scraper.linkedinEnabled) {
+      return res.status(503).json({
+        success: false,
+        error: 'LinkedIn scraper is disabled (LINKEDIN_ENABLED=false)',
       });
     }
 
@@ -361,6 +373,12 @@ router.post('/af', async (req: Request, res: Response) => {
       return res.status(503).json({
         success: false,
         error: 'Scraper is disabled',
+      });
+    }
+    if (!config.scraper.afEnabled) {
+      return res.status(503).json({
+        success: false,
+        error: 'Arbetsförmedlingen scraper is disabled (AF_ENABLED=false)',
       });
     }
 

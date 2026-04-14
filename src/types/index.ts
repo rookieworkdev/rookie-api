@@ -177,6 +177,10 @@ export interface Config {
   emailWhitelist: string[];
   scraper: {
     enabled: boolean;
+    indeedEnabled: boolean;
+    linkedinEnabled: boolean;
+    afEnabled: boolean;
+    googleMapsEnabled: boolean;
     keywords: string;
     exclusionKeywords: string[];
     country: string;

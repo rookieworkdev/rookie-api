@@ -59,36 +59,50 @@ export function startCronJobs(): void {
   const scheduledJobs: string[] = [];
 
   if (scraperEnabled) {
-    // Job scrapers — staggered daily to avoid overlapping API calls
-    cron.schedule('0 6 * * *', () => callEndpoint('Indeed scraper', 'POST', '/api/scraping/jobs/indeed'), {
-      timezone: 'UTC',
-    });
+    // Job scrapers — staggered daily. Each is gated by its own flag so
+    // a single scraper can be paused without touching the others.
+    if (config.scraper.indeedEnabled) {
+      cron.schedule('0 6 * * *', () => callEndpoint('Indeed scraper', 'POST', '/api/scraping/jobs/indeed'), {
+        timezone: 'UTC',
+      });
+      scheduledJobs.push('Indeed (daily 06:00 UTC)');
+    } else {
+      logger.warn('[cron] INDEED_ENABLED=false — Indeed scraper cron skipped');
+    }
 
-    cron.schedule('0 7 * * *', () => callEndpoint('LinkedIn scraper', 'POST', '/api/scraping/jobs/linkedin'), {
-      timezone: 'UTC',
-    });
+    if (config.scraper.linkedinEnabled) {
+      cron.schedule('0 7 * * *', () => callEndpoint('LinkedIn scraper', 'POST', '/api/scraping/jobs/linkedin'), {
+        timezone: 'UTC',
+      });
+      scheduledJobs.push('LinkedIn (daily 07:00 UTC)');
+    } else {
+      logger.warn('[cron] LINKEDIN_ENABLED=false — LinkedIn scraper cron skipped');
+    }
 
-    cron.schedule('0 8 * * *', () => callEndpoint('AF scraper', 'POST', '/api/scraping/jobs/af'), {
-      timezone: 'UTC',
-    });
+    if (config.scraper.afEnabled) {
+      cron.schedule('0 8 * * *', () => callEndpoint('AF scraper', 'POST', '/api/scraping/jobs/af'), {
+        timezone: 'UTC',
+      });
+      scheduledJobs.push('AF (daily 08:00 UTC)');
+    } else {
+      logger.warn('[cron] AF_ENABLED=false — Arbetsförmedlingen scraper cron skipped');
+    }
 
     // Lead scrapers — weekly during development, reduce frequency once good coverage achieved
-    cron.schedule('0 10 * * 0', () => callEndpoint('Google Maps scraper', 'POST', '/api/scraping/leads/google-maps'), {
-      timezone: 'UTC',
-    });
+    if (config.scraper.googleMapsEnabled) {
+      cron.schedule('0 10 * * 0', () => callEndpoint('Google Maps scraper', 'POST', '/api/scraping/leads/google-maps'), {
+        timezone: 'UTC',
+      });
+      scheduledJobs.push('Google Maps (Sunday 10:00 UTC)');
+    } else {
+      logger.warn('[cron] GOOGLEMAPS_ENABLED=false — Google Maps scraper cron skipped');
+    }
 
-    // Maintenance
+    // Maintenance (not gated per-scraper — cleanup is safe whenever scrapers are on)
     cron.schedule('0 0 * * 0', () => callEndpoint('Job cleanup', 'POST', '/api/scraping/jobs/cleanup'), {
       timezone: 'UTC',
     });
-
-    scheduledJobs.push(
-      'Indeed (daily 06:00 UTC)',
-      'LinkedIn (daily 07:00 UTC)',
-      'AF (daily 08:00 UTC)',
-      'Google Maps (Sunday 10:00 UTC)',
-      'Cleanup (Sunday 00:00 UTC)',
-    );
+    scheduledJobs.push('Cleanup (Sunday 00:00 UTC)');
   } else {
     logger.warn('[cron] SCRAPER_ENABLED=false — all scraper and cleanup cron jobs skipped');
   }
