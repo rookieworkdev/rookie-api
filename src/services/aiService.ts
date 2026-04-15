@@ -789,7 +789,7 @@ export async function parseCv(cvText: string): Promise<CvParsedData> {
         .trim()
     );
 
-    const jsonParsed = JSON.parse(cleanContent);
+    const jsonParsed = unwrapIfArray(JSON.parse(cleanContent));
     const validated = CvParsedDataSchema.safeParse(jsonParsed);
 
     if (!validated.success) {
@@ -857,14 +857,33 @@ async function parseCvWithFallback(cvText: string): Promise<CvParsedData> {
       .trim()
   );
 
-  const jsonParsed = JSON.parse(cleanContent);
+  const jsonParsed = unwrapIfArray(JSON.parse(cleanContent));
   const validated = CvParsedDataSchema.safeParse(jsonParsed);
 
   if (!validated.success) {
+    logger.error('Fallback CV parsing response validation failed', {
+      errors: validated.error.errors,
+      rawContent: cleanContent.substring(0, 500),
+    });
     throw new Error(`Invalid fallback AI response: ${validated.error.message}`);
   }
 
+  logger.info('CV parsing complete (fallback)', {
+    educationCount: validated.data.education.length,
+    experienceCount: validated.data.experience.length,
+    skillsCount: validated.data.skills.length,
+  });
+
   return validated.data;
+}
+
+// Some Gemini responses wrap the CV object in a single-element array.
+// Unwrap so the schema (which expects an object) accepts both shapes.
+function unwrapIfArray(value: unknown): unknown {
+  if (Array.isArray(value) && value.length === 1 && typeof value[0] === 'object') {
+    return value[0];
+  }
+  return value;
 }
 
 // ============================================================================
