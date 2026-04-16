@@ -107,8 +107,77 @@ Return ONLY valid JSON with these keys: profile, education, experience, skills, 
 }
 
 /**
+ * Normalize non-canonical skill level values the LLM sometimes returns
+ * (e.g. "excellent", "expert", "god") into the three allowed enum values.
+ * Unknown values become null rather than failing validation — this prevents
+ * the primary model from falling through to the slower fallback model
+ * just because of a vocabulary mismatch.
+ */
+const SKILL_LEVEL_MAP: Record<string, 'beginner' | 'intermediate' | 'advanced'> = {
+  beginner: 'beginner',
+  basic: 'beginner',
+  grundläggande: 'beginner',
+  novice: 'beginner',
+  intermediate: 'intermediate',
+  god: 'intermediate',
+  good: 'intermediate',
+  proficient: 'intermediate',
+  advanced: 'advanced',
+  avancerad: 'advanced',
+  expert: 'advanced',
+  senior: 'advanced',
+  excellent: 'advanced',
+  fluent: 'advanced',
+  flytande: 'advanced',
+};
+
+const PROFICIENCY_MAP: Record<
+  string,
+  'native' | 'fluent' | 'advanced' | 'intermediate' | 'beginner'
+> = {
+  native: 'native',
+  modersmål: 'native',
+  'mother tongue': 'native',
+  'native speaker': 'native',
+  fluent: 'fluent',
+  flytande: 'fluent',
+  'full professional': 'fluent',
+  'professional working proficiency': 'fluent',
+  advanced: 'advanced',
+  god: 'advanced',
+  good: 'advanced',
+  'limited working proficiency': 'advanced',
+  intermediate: 'intermediate',
+  conversational: 'intermediate',
+  beginner: 'beginner',
+  basic: 'beginner',
+  grundläggande: 'beginner',
+  elementary: 'beginner',
+};
+
+function normalizeSkillLevel(
+  val: unknown,
+): 'beginner' | 'intermediate' | 'advanced' | null {
+  if (val == null || typeof val !== 'string') return null;
+  return SKILL_LEVEL_MAP[val.toLowerCase().trim()] ?? null;
+}
+
+function normalizeProficiency(
+  val: unknown,
+): 'native' | 'fluent' | 'advanced' | 'intermediate' | 'beginner' | null {
+  if (val == null || typeof val !== 'string') return null;
+  return PROFICIENCY_MAP[val.toLowerCase().trim()] ?? null;
+}
+
+/**
  * Zod schema for validating the LLM's CV parsing output.
  * Matches the database schema in rookie-platform.
+ *
+ * NOTE: `skills.level` and `languages.proficiency` use z.preprocess so any
+ * string the LLM returns is normalized before validation. The prompt still
+ * instructs the model to use the canonical values, but if it returns
+ * "excellent" or "expert" instead, we map it rather than rejecting the whole
+ * response (which triggers an expensive fallback model call).
  */
 export const CvParsedDataSchema = z.object({
   profile: z.object({
@@ -143,14 +212,20 @@ export const CvParsedDataSchema = z.object({
   skills: z.array(
     z.object({
       skill_name: z.string().nullable().default(null),
-      level: z.enum(['beginner', 'intermediate', 'advanced']).nullable(),
+      level: z.preprocess(
+        normalizeSkillLevel,
+        z.enum(['beginner', 'intermediate', 'advanced']).nullable(),
+      ),
       years: z.number().nullable(),
     }),
   ),
   languages: z.array(
     z.object({
       language: z.string().nullable().default(null),
-      proficiency: z.enum(['native', 'fluent', 'advanced', 'intermediate', 'beginner']).nullable(),
+      proficiency: z.preprocess(
+        normalizeProficiency,
+        z.enum(['native', 'fluent', 'advanced', 'intermediate', 'beginner']).nullable(),
+      ),
     }),
   ),
   references: z.array(
