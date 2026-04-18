@@ -120,6 +120,20 @@ export function startCronJobs(): void {
   });
   scheduledJobs.push('Match notifications (every 30 min -> platform)');
 
+  // Job expiration — hourly, calls platform endpoint to unpublish jobs past expires_at
+  // and notify applicants (bell + email)
+  cron.schedule('0 * * * *', () => callEndpoint('Job expiration', 'GET', '/api/cron/expire-jobs', PLATFORM_URL), {
+    timezone: 'UTC',
+  });
+  scheduledJobs.push('Job expiration (hourly -> platform)');
+
+  // Consent cleanup — daily 02:00 UTC, calls platform endpoint to purge candidates/companies
+  // whose pending consent request has passed CONSENT_EXPIRY_DAYS (GDPR retention)
+  cron.schedule('0 2 * * *', () => callEndpoint('Consent cleanup', 'GET', '/api/cron/consent-cleanup', PLATFORM_URL), {
+    timezone: 'UTC',
+  });
+  scheduledJobs.push('Consent cleanup (daily 02:00 UTC -> platform)');
+
   logger.info(`[cron] Scheduled ${scheduledJobs.length} cron jobs (scrapers ${scraperEnabled ? 'ON' : 'OFF'})`, {
     jobs: scheduledJobs,
   });
